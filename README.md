@@ -2,7 +2,7 @@
 This project aims to make the heatpump system used is modern Tesla vehicles easy to use in any EV conversion or else.
 The controller plugs directly into the existing wiring harness of the supermanifold and can be controlled by simple inputs, or via CAN.
 
-### Heatpump in short:
+### Heatpump features:
 - 3 coolant loops
   - Motor
   - Battery
@@ -11,20 +11,20 @@ The controller plugs directly into the existing wiring harness of the supermanif
   - Cabin left heat
   - Cabin right heat
   - Cabin cooling
-- Heat energy can be moved back and forth in any loop
+- Heat energy can be moved between any loop for ultra efficiency
 
-### Controller in short:
+### Controller features:
 - Digital inputs
   - Heat battery
   - Cool battery
   - Heat cabin left
   - Heat cabin right
   - Cool cabin
-  - Enable input
-  - General purpose input
+  - Enable compressor input
+  - Key-on / Wakeup
 - Analog inputs
   - 4x temperature sensors for cabin/motor/battery etc.
-- RS232 port for openinverter esp8266 (not onboard)
+- ESP32 with webserver onboard for configuration and diagnostics
 - CAN-bus for complete control and diagnostics
 - PWM outputs
   - 12V pwm for radiator fan
@@ -53,16 +53,3 @@ Now you can compile stm32-<yourname> by typing
 `make`
 
 And upload it to your board using a JTAG/SWD adapter, the updater.py script or the esp8266 web interface.
-
-# Editing
-The repository provides a project file for Code::Blocks, a rather leightweight IDE for cpp code editing.
-For building though, it just executes the above command. Its build system is not actually used.
-Consequently you can use your favority IDE or editor for editing files.
-
-# Adding classes or modules
-As your firmware grows you probably want to add classes. To do so, put the header file in include/ and the 
-source file in src/ . Then add your module to the object list in Makefile that starts in line 43 with .o
-extension. So if your files are called "mymodule.cpp" and "mymodule.h" you add "mymodule.o" to the list.
-
-When changing a header file the build system doesn't always detect this, so you have to "make clean" and
-then make. This is especially important when editing the "*_prj.h" files.

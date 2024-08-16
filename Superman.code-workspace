@@ -1,0 +1,33 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"cmath": "cpp",
+			"typeinfo": "cpp",
+			"random": "cpp",
+			"limits": "cpp",
+			"*.tcc": "cpp",
+			"fstream": "cpp",
+			"atomic": "cpp",
+			"cstdint": "cpp",
+			"memory": "cpp",
+			"functional": "cpp",
+			"optional": "cpp",
+			"istream": "cpp",
+			"ostream": "cpp",
+			"system_error": "cpp",
+			"array": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"utility": "cpp",
+			"string": "c",
+			"string_view": "c",
+			"algorithm": "cpp",
+			"spi_common_all.h": "c"
+		}
+	}
+}

@@ -30,6 +30,10 @@ void clock_setup(void);
 void nvic_setup(void);
 void rtc_setup(void);
 void tim_setup(void);
+void exti_setup(void);
+void i2c_setup(void);
+void spi1_setup();   //spi 1 used for External ADC
+void usart3_setup(void); // for LIN comms
 void write_bootloader_pininit();
 
 #ifdef __cplusplus
