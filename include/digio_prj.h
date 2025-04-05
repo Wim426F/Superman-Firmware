@@ -9,18 +9,22 @@
 */
 
 #define DIG_IO_LIST \
-    DIG_IO_ENTRY(pwm_fan,     GPIOA, GPIO2,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(pwm_servo,   GPIOA, GPIO3,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(octo_pulse,  GPIOA, GPIO8,  PinMode::INPUT_FLT)      \
+    DIG_IO_ENTRY(pwm_servo,   GPIOA, GPIO2,  PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(pwm_fan,     GPIOA, GPIO3,  PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(spi1_cs,     GPIOA, GPIO4,  PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(octo_pulse,  GPIOA, GPIO8,  PinMode::INPUT_FLT)   \
     DIG_IO_ENTRY(exp1_dir,    GPIOA, GPIO15, PinMode::OUTPUT)      \
     DIG_IO_ENTRY(cabin_heatr, GPIOB, GPIO2,  PinMode::INPUT_PD)    \
     DIG_IO_ENTRY(exp6_dir,    GPIOB, GPIO3,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp6_step,   GPIOB, GPIO4,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp6_en,     GPIOB, GPIO5,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(i2c1_scl,    GPIOB, GPIO6,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(i2c1_sda,    GPIOB, GPIO7,  PinMode::OUTPUT_OD)   \
-    DIG_IO_ENTRY(i2c2_scl,    GPIOB, GPIO10, PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(i2c2_sda,    GPIOB, GPIO11, PinMode::OUTPUT_OD)   \
+    DIG_IO_ENTRY(pwm_pump_battery,    GPIOB, GPIO6,  PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(pwm_pump_powertrain, GPIOB, GPIO7,  PinMode::OUTPUT_OD)   \
+    DIG_IO_ENTRY(pump_battery_fb,     GPIOB, GPIO8,  PinMode::INPUT_FLT)   \
+    DIG_IO_ENTRY(pump_powertrain_fb,  GPIOB, GPIO9,  PinMode::INPUT_FLT)   \
+    DIG_IO_ENTRY(lin_wake,    GPIOB, GPIO12, PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(lin_sleep,   GPIOB, GPIO13, PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(led_out,     GPIOB, GPIO14, PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp1_step,   GPIOC, GPIO10, PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp1_en,     GPIOC, GPIO11, PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp2_dir,    GPIOC, GPIO12, PinMode::OUTPUT)      \
@@ -37,14 +41,14 @@
     DIG_IO_ENTRY(exp5_dir,    GPIOE, GPIO2,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp5_step,   GPIOE, GPIO3,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp5_en,     GPIOE, GPIO4,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(exp_sleep,   GPIOE, GPIO5,   PinMode::OUTPUT_OD)  \
-    DIG_IO_ENTRY(solenoid,    GPIOE, GPIO6,   PinMode::OUTPUT)     \
-    DIG_IO_ENTRY(gpi1,        GPIOE, GPIO7,   PinMode::INPUT_PD)   \
-    DIG_IO_ENTRY(cabin_heatl, GPIOE, GPIO8,   PinMode::INPUT_PD)   \
-    DIG_IO_ENTRY(cabin_cool,  GPIOE, GPIO9,   PinMode::INPUT_PD)   \
-    DIG_IO_ENTRY(battery_heat,GPIOE, GPIO10,   PinMode::INPUT_PD)  \
-    DIG_IO_ENTRY(battery_cool,GPIOE, GPIO11,   PinMode::INPUT_PD)  \
-    DIG_IO_ENTRY(pumps_enable,GPIOE, GPIO12,   PinMode::INPUT_PD)  \
+    DIG_IO_ENTRY(exp_sleep,   GPIOE, GPIO5,  PinMode::OUTPUT_OD)   \
+    DIG_IO_ENTRY(valve_lcc,   GPIOE, GPIO6,  PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(compressor_en, GPIOE, GPIO7,PinMode::INPUT_PD)    \
+    DIG_IO_ENTRY(cabin_heatl, GPIOE, GPIO8,  PinMode::INPUT_PD)    \
+    DIG_IO_ENTRY(cabin_cool,  GPIOE, GPIO9,  PinMode::INPUT_PD)    \
+    DIG_IO_ENTRY(battery_heat,GPIOE, GPIO10, PinMode::INPUT_PD)    \
+    DIG_IO_ENTRY(battery_cool,GPIOE, GPIO11, PinMode::INPUT_PD)    \
+    DIG_IO_ENTRY(pumps_enable,GPIOE, GPIO12, PinMode::INPUT_PD)    \
 
 
 #endif // PinMode_PRJ_H_INCLUDED

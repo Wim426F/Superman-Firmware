@@ -44,17 +44,17 @@ class MCP3208 {
     private:
         // Private functions and variables here.  They can only be accessed
         // by functions within the class.
-        DigIo _cs;
+        DigIo& _cs;
         uint32_t _spi;
 
-        void digitalWrite(DigIo _cs, bool state);
+        void digitalWrite(DigIo& _cs, bool state);
         uint8_t spiTransfer(uint8_t);
 
     public:
         // Public functions and variables.  These can be accessed from
         // outside the class.
         
-        MCP3208(uint32_t spi, DigIo cs_pin) : _spi(spi), _cs(cs_pin) {}
+        MCP3208(uint32_t spi, DigIo& cs_pin) : _spi(spi), _cs(cs_pin) {}
 
     
         void begin();

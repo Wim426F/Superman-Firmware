@@ -15,6 +15,17 @@ uint16_t knob_cabinr_heating = 0;
 uint16_t knob_cabin_cooling = 0;
 uint16_t knob_acpower = 0;
 
+float HIGH_PRESSURE_LIMIT = 30; // bar
+float LOW_PRESSURE_LIMIT = 0.5; // bar
+
+// PI Control Variables
+float Kp = 0.5;  // Proportional Gain
+float Ki = 0.1;  // Integral Gain
+float integral_compressor = 0;
+float integral_expansion = 0;
+float dt = 0.1;  // Time step
+float accumulated_error = 0;
+
 void getFlags()
 {
     //Flags
@@ -38,25 +49,71 @@ void getFlags()
     else 
         flag_cabinl_needs_heating = false;
 
+}
 
-    //Analog settings
-    knob_cabinl_heating = utils::change(Param::GetInt(Param::ana_in1), 0,4095, 0,255);
-    knob_cabinr_heating = utils::change(Param::GetInt(Param::ana_in2), 0,4095, 0,255);
-    knob_cabin_cooling = utils::change(Param::GetInt(Param::ana_in3), 0,4095, 0,255);
-    knob_acpower = utils::change(Param::GetInt(Param::ana_in4), 0,4095, 0,255);
+void controlLoop()
+{
+    float setpoint, measured_temp, error, control_output;
+    bool isHeating = false, isCooling = false;
+    
+    if (flag_cabin_needs_cooling)
+    {
+        isCooling = true;
+        setpoint = Param::GetInt(Param::temp_evaporator_setp);
+        measured_temp = Param::GetInt(Param::temp_pre_evaporator);
+    }
+    else if (flag_cabinl_needs_heating || flag_cabinr_needs_heating)
+    {
+        isHeating = true;
+        setpoint = Param::GetInt(Param::temp_condensor_setp);
+        measured_temp = Param::GetInt(Param::temp_outlet_compressor);
+    }
+    else
+    {
+        Compressor::SetDuty(0);
+        return;
+    }
 
+    // Safety checks for pressure limits
+    float high_side_pressure = Param::GetInt(Param::pressure_outlet_compressor);
+    float low_side_pressure = Param::GetInt(Param::pressure_pre_evaporator);
+    
+    if (high_side_pressure > HIGH_PRESSURE_LIMIT)
+    {
+        Compressor::SetDuty(Compressor::GetDuty() * 0.8); // Reduce duty cycle to prevent overpressure
+    }
+    else if (low_side_pressure < LOW_PRESSURE_LIMIT)
+    {
+        Compressor::SetDuty(Compressor::GetDuty() * 0.8); // Reduce duty cycle
+    }
+    else
+    {
+        error = setpoint - measured_temp;
+        control_output = Kp * error + Ki * accumulated_error;
+        accumulated_error += error;
+        control_output = utils::limitVal(control_output, 0, 100);
+        
+        Compressor::SetDuty(control_output);
+    }
+    
+    if (isCooling)
+    {
+        Valve::expansionSetPos(EXPV_EVAPORATOR_CABIN, control_output); //reject the heat to coolant / cool cabin
+        Valve::expansionSetPos(EXPV_CONDENSOR_COOLANT, 255); // just fully open the valve to condensor without restriction
+    }
+    else if (isHeating)
+    {
+        Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT, control_output); //reject the heat to cabin
+        Valve::expansionSetPos(EXPV_CONDENSOR_CABINR, 128); // just fully open the valve to condensor without restriction
+        Valve::expansionSetPos(EXPV_CONDENSOR_CABINL, 128); // just fully open the valve to condensor without restriction
+    }
 }
 
 
 void StateMachine()
 {
     getFlags();
-
-/*  --------------------------------------------------  */
-/*       Heating and Cooling controlled manually        */
-/*  --------------------------------------------------  */
-if (Param::GetInt(Param::control_mode) == ControlMode::Classic)
-{   
+ 
     // Check if any flag is enabled
     if (flag_batt_needs_heating + 
         flag_batt_needs_cooling + 
@@ -65,85 +122,42 @@ if (Param::GetInt(Param::control_mode) == ControlMode::Classic)
         flag_cabin_needs_cooling + 
         flag_powertrain_needs_cooling > 0)
     {
-        Compressor::SetDuty(100); // percentage duty
+        //
     }
 
 
 /*------------------------------*/
 /*      Octovalve settings      */
 /*------------------------------*/
-    //pos1 is the same as pos2
+
+    // POS1             Same as POS2
+	// POS2_SERIES      Battery and powertrain in series, Cool battery and powertrain, Reject heat to radiator or cabin
+	// POS3_AMBIENT     Reject heat to battery or cabin, Get heat from radiator
+	// POS4_RBYPASS     Battery and powertrain in series, Cool battery and powertrain, Exclude radiator, Reject heat to cabin
+	// POS5_PARALLEL    Battery and powertrain separate, Cool battery with a/c, Powertrain heat to radiator, Reject heat from battery or cabin to radiator
 
     if (flag_batt_needs_cooling && flag_powertrain_needs_cooling)
     {
-        Valve::octoSetPos(OctoPositions::POS2);
+        Valve::octoSetPos(OctoPositions::POS2_SERIES);
     }
 
     if (flag_batt_needs_heating)
     {
-        Valve::octoSetPos(OctoPositions::POS3);
+        Valve::octoSetPos(OctoPositions::POS3_AMBIENT);
     }
 
     if (flag_batt_needs_cooling && flag_powertrain_needs_cooling)
     {
-        Valve::octoSetPos(OctoPositions::POS4);
+        Valve::octoSetPos(OctoPositions::POS4_RBYPASS);
     }
 
     if (flag_batt_needs_cooling && flag_cabinl_needs_heating || flag_cabinr_needs_heating)
     {
-        Valve::octoSetPos(OctoPositions::POS5);
+        Valve::octoSetPos(OctoPositions::POS5_PARALLEL);
     }
     
-
-
-
-/*------------------------------------*/
-/*      Expansion Valve Settings      */
-/*------------------------------------*/
-
-    /*
-    exp1:   Recirculation for quick heat
-    exp2:   Heat LCC
-    exp3:   Heat cabin right
-    exp4:   Heat cabin left
-    exp5:   Cool chiller
-    exp6:   Cool cabin
-    */
-
-    if (flag_cabinr_needs_heating || flag_cabinl_needs_heating)
-    {
-        Valve::expansionSetPos(EXP3, knob_cabinr_heating);
-        Valve::expansionSetPos(EXP4, knob_cabinl_heating);
-
-        // still need to get the heat from somewhere..
-        // open the chiller expansion valve. 
-        // This will typically be taken from the battery. depending on octovalve position.
-        Valve::expansionSetPos(EXP5, std::max(knob_cabinr_heating,knob_cabinl_heating));
-    }
-        
-    if (flag_cabin_needs_cooling)
-    {
-        Valve::expansionSetPos(EXP6, knob_cabin_cooling);
-
-        // still need to get rid of the heat absorbed from the cabin.
-        // Open expansion valve to the LCC.
-        // This will typically be rejected via radiator,
-        // But could also be the battery depending on octovalve position.
-        Valve::expansionSetPos(EXP2, knob_cabin_cooling);
-    }
-        
+    controlLoop();
 
 }
 
 
-
-
-/*  ----------------------------------------------------------------  */
-/*    Heating and Cooling controlled automatically with setpoints     */
-/*  ----------------------------------------------------------------  */
-if (Param::GetInt(Param::control_mode) == ControlMode::ClimateControl)
-{
-    
-}
-
-}

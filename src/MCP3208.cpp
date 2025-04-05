@@ -36,12 +36,12 @@
 #define LOW 0
 #define HIGH 1
 
-void MCP3208::digitalWrite(DigIo pin, bool state)
-{/*
+void MCP3208::digitalWrite(DigIo& pin, bool state)
+{
     if (state)
-        _cs.Set();
+        pin.Set();
     else
-        _cs.Clear(); */
+        pin.Clear();
 }
 
 void MCP3208::begin() {

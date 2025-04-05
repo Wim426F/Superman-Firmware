@@ -88,7 +88,7 @@ void write_bootloader_pininit()
 
    //!!! Customize this to match your project !!!
    //Here we specify that PC13 be initialized to ON
-   //AND PB1 AND PB2 be initialized to OFF
+   //AND C13 AND C14 be initialized to OFF
    commands.pindef[0].port = GPIOC;
    commands.pindef[0].pin = GPIO13 | GPIO14; // octovalve pin 1 and 2
    commands.pindef[0].inout = PIN_OUT;
@@ -128,7 +128,7 @@ void spi1_setup()   //spi 1 used for External ADC
    spi_enable(SPI1);
 }
 
-void usart3_setup(void)
+void usart3_setup(void) // For LIN
 {
    /* Setup GPIO pin GPIO_USART3_TX and GPIO_USART3_RX. */
    gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_50_MHZ,
@@ -149,12 +149,10 @@ void usart3_setup(void)
 */
 void nvic_setup(void)
 {
-   nvic_enable_irq(NVIC_TIM2_IRQ); //Scheduler
-   nvic_enable_irq(NVIC_EXTI0_IRQ);
-
-   nvic_set_priority(NVIC_TIM2_IRQ, 0xe << 4); //second lowest priority
-
-   
+   nvic_enable_irq(NVIC_TIM3_IRQ); //Scheduler
+   nvic_set_priority(NVIC_TIM3_IRQ, 0); //Highest priority
+   //nvic_set_priority(NVIC_TIM2_IRQ, 0xe << 4); //second lowest priority
+   //nvic_enable_irq(NVIC_EXTI0_IRQ); // interrupt for octovalve encoder
 }
 
 void rtc_setup()

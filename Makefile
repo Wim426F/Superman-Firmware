@@ -40,7 +40,7 @@ OBJSL		  = main.o hwinit.o stm32scheduler.o params.o terminal.o terminal_prj.o \
              my_string.o digio.o sine_core.o my_fp.o printf.o anain.o \
              param_save.o errormessage.o stm32_can.o canhardware.o canmap.o cansdo.o \
              picontroller.o terminalcommands.o valves.o pumps.o sensors.o utils.o \
-			 interface.o temp_meas.o Ewma.o drv8316.o MCP3208.o statemachine.o
+			 interface.o temp_meas.o Ewma.o MCP3208.o statemachine.o linbus.o
 
 OBJS     = $(patsubst %.o,obj/%.o, $(OBJSL))
 DEPENDS = $(patsubst %.o,obj/%.d, $(OBJSL))

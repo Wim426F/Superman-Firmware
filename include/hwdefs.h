@@ -21,7 +21,7 @@
 #define PWMIN_PUMPA_TIM    TIM4
 #define PWMIN_PUMPA_CH     TIM_IC3
 
-#define PWMIN_PUMPB_CH     TIM4
+#define PWMIN_PUMPB_TIM    TIM4
 #define PWMIN_PUMPB_CH     TIM_IC4
 
 //Address of parameter block in flash
