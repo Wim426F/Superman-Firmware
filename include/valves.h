@@ -7,12 +7,15 @@
 #include "digio.h"
 #include "utils.h"
 
-#define EXPV_RECIRCULATION 1
+#define EXPV_EVAPORATOR_RECIRC 1
 #define EXPV_CONDENSOR_COOLANT 2
 #define EXPV_CONDENSOR_CABINR 3
 #define EXPV_CONDENSOR_CABINL 4
 #define EXPV_EVAPORATOR_COOLANT 5
 #define EXPV_EVAPORATOR_CABIN 6
+
+#define CLOCKWISE true
+#define COUNTERCLOCKWISE false
 
 class Valve
 {
@@ -32,6 +35,8 @@ public:
 
     static int octoSetPos(int set_position);
     static int octoGetPos();
+
+    static bool valve_turning_direction;
 };
 
 

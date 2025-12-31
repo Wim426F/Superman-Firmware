@@ -1,41 +1,26 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug VCU",
-            "type": "cppdbg",
+            "name": "Debug STM32 (OpenOCD)",
+            "cwd": "${workspaceFolder}",
+            "executable": "./stm32_superman",
             "request": "launch",
-            "miDebuggerPath": "arm-none-eabi-gdb",
-            "targetArchitecture": "arm",
-            "program": "${workspaceFolder}/stm32_vcu",
-            "setupCommands": [
-                {
-                    "text": "set target-async off"
-                },
-                {
-                    "text": "file ${workspaceFolder}/stm32_vcu"
-                },
-                {
-                    "text": "set remote hardware-breakpoint-limit 6"
-                },
-                {
-                    "text": "set remote hardware-watchpoint-limit 4"
-                },
-                {
-                    "text": "target extended-remote localhost:3333"
-                },
-                {
-                    "text": "monitor arm semihosting enable"
-                },
-                {
-                    "text": "load ${workspaceFolder}/stm32_vcu"
-                }
+            "type": "cortex-debug",
+            "runToEntryPoint": "Reset_Handler",
+            "servertype": "openocd",
+            "gdbPath": "arm-none-eabi-gdb.exe",
+            "armToolchainPath": "C:/Program Files (x86)/arm-gnu-toolchain/bin/",
+            "serverpath": "C:/openocd/bin/openocd.exe",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f1x.cfg"
             ],
-            "externalConsole": false,
-            "cwd": "${workspaceFolder}"
+            "searchDir": ["C:/openocd/share/openocd/scripts"],
+            "serverArgs": ["-s", "C:/openocd/share/openocd/scripts"],
+            "svdFile": "${workspaceFolder}/STM32F103.svd",
+            "preLaunchTask": "Build Project",
+            "showDevDebugOutput": "parsed"
         }
     ]
 }

@@ -28,6 +28,7 @@
 #include "stm32_can.h"
 #include "canmap.h"
 #include "cansdo.h"
+#include "sdocommands.h"
 #include "terminal.h"
 #include "params.h"
 #include "hwdefs.h"
@@ -40,15 +41,13 @@
 #include "printf.h"
 #include "stm32scheduler.h"
 #include "terminalcommands.h"
-#include "linbus.h"
 
 #include "valves.h"
 #include "interface.h"
 #include "temp_meas.h"
 #include "sensors.h"
 #include "pumps.h"
-#include "MCP3208.h"
-#include "statemachine.h"
+#include "thermal_control.h"
 
 
 #define CAN_TIMEOUT 50  //500ms
@@ -61,15 +60,29 @@ static CanHardware* can;
 static CanMap* canMap;
 static CanSdo* canSdo;
 static Terminal* terminal;
-static LinBus* lin;
 
 
-MCP3208 adc(SPI1, DigIo::spi1_cs);
+volatile int octovalve_position = 0;
+volatile uint32_t pump_batt_high_time = 0, pump_batt_period = 0;
+volatile uint32_t pump_pt_high_time = 0, pump_pt_period = 0;
+volatile bool pump_batt_ready = false, pump_pt_ready = false;
 
-uint16_t exti_line_state;
- 
 
-static void Ms1_5Task(void) // used for step drivers, 2ms interval dictates step pulse and is very critical!
+float GetBatteryPumpDuty() {
+    if (!pump_batt_ready) return 0.0f;
+    pump_batt_ready = false;
+    if (pump_batt_period == 0) return 0.0f;
+    return (float)pump_batt_high_time / pump_batt_period * 100.0f;
+}
+
+float GetPowertrainPumpDuty() {
+    if (!pump_pt_ready) return 0.0f;
+    pump_pt_ready = false;
+    if (pump_pt_period == 0) return 0.0f;
+    return (float)pump_pt_high_time / pump_pt_period * 100.0f;
+}
+
+static void Ms1_5Task(void) // used for step drivers, 1.5ms interval for step pulse is very critical!
 {
    Valve::expansionRunSteps();
 }
@@ -88,89 +101,14 @@ static void Ms10Task(void)
       ErrorMessage::Post(ERR_CANTIMEOUT);
    }
 
-   Param::SetInt(Param::cool_battery, DigIo::battery_cool.Get());
-   Param::SetInt(Param::heat_battery, DigIo::battery_heat.Get());
    Param::SetInt(Param::heat_cabinl, DigIo::cabin_heatl.Get());
    Param::SetInt(Param::heat_cabinr, DigIo::cabin_heatr.Get());
    Param::SetInt(Param::cool_cabin, DigIo::cabin_cool.Get());
-   Param::SetInt(Param::enable_pumps, DigIo::pumps_enable.Get());
+   Param::SetInt(Param::preheat_req, DigIo::preheat_req.Get());
 
-
-   if(Param::GetInt(Param::cool_battery))
-   {
-      DigIo::octo_in1.Set();
-      DigIo::octo_in2.Clear();
-   }
-
-   if(Param::GetInt(Param::heat_battery))
-   {
-      DigIo::octo_in1.Clear();
-      DigIo::octo_in2.Set();
-   }
-
-   if(Param::GetInt(Param::cool_battery) == 0 && Param::GetInt(Param::heat_battery) == 0)
-   {
-      DigIo::octo_in1.Clear();
-      DigIo::octo_in2.Clear();
-   }
-
-   if(Param::GetInt(Param::compressor_enable))
-   {
-      Valve::solenoidClose();
-   }  
-   else
-   {
-      Valve::solenoidOpen();
-   }
-
-   //webbased
-   if(Param::GetInt(Param::temp_cabinl_setp) == 1)
-   {
-      Valve::expansionSetPos(EXPV_RECIRCULATION , Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_CONDENSOR_COOLANT, Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_CONDENSOR_CABINR , Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_CONDENSOR_CABINL , Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT, Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_EVAPORATOR_CABIN , Param::GetInt(Param::compressor_plim));
-   }
-
-   if(Param::GetInt(Param::temp_cabinl_setp) == 2)
-   {
-      Valve::expansionSetPos(EXPV_RECIRCULATION , 0);
-      Valve::expansionSetPos(EXPV_CONDENSOR_COOLANT, 0);
-      Valve::expansionSetPos(EXPV_CONDENSOR_CABINR , 0);
-      Valve::expansionSetPos(EXPV_CONDENSOR_CABINL , 0);
-      Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT, 0);
-      Valve::expansionSetPos(EXPV_EVAPORATOR_CABIN , 0);
-   }
-
-   //gpio
-   if(Param::GetInt(Param::heat_cabinl))
-   {
-      Valve::expansionSetPos(EXPV_RECIRCULATION , Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_CONDENSOR_COOLANT, Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_CONDENSOR_CABINR , Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_CONDENSOR_CABINL , Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT, Param::GetInt(Param::compressor_plim));
-      Valve::expansionSetPos(EXPV_EVAPORATOR_CABIN , Param::GetInt(Param::compressor_plim));
-   }
-
-   if(Param::GetInt(Param::heat_cabinr))
-   {
-      Valve::expansionSetPos(EXPV_RECIRCULATION , 0);
-      Valve::expansionSetPos(EXPV_CONDENSOR_COOLANT, 0);
-      Valve::expansionSetPos(EXPV_CONDENSOR_CABINR , 0);
-      Valve::expansionSetPos(EXPV_CONDENSOR_CABINL , 0);
-      Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT, 0);
-      Valve::expansionSetPos(EXPV_EVAPORATOR_CABIN , 0);
-   }
-
-   if(Param::GetInt(Param::cool_cabin))
-   {
-      Valve::expansionCalibrateAll();
-   }
-
-   
+   Param::SetInt(Param::pump_battery_duty, GetBatteryPumpDuty());
+   Param::SetInt(Param::pump_powertrain_duty, GetPowertrainPumpDuty());
+   Param::SetInt(Param::octo_pos, octovalve_position);
 
 
    //If we chose to send CAN messages every 10 ms, do this here.
@@ -193,24 +131,12 @@ static void Ms100Task(void)
    //Set timestamp of error message
    ErrorMessage::SetTime(rtc_get_counter_val());
    
-   
    Interface::SendMessages(can);
    Compressor::SendMessages(can);
 
-//   Param::SetInt(Param::octo_pos, Valve::octoGetPos());
-//   Param::SetFloat(Param::pump_battery_flow, Waterpump::batteryGetFlow());
-//   Param::SetFloat(Param::pump_powertrain_flow, Waterpump::powertrainGetFlow());
+   GetSensorReadings();
 
-   GetTemps();
-   
-   Param::SetInt(Param::knob_cabinl,      adc.analogRead(6));
-   Param::SetInt(Param::knob_cabinr,      adc.analogRead(7));
-
-
-   /*  --------------------------------------------------  */
-   /*    The whole thermal management happens in here      */
-   /*  --------------------------------------------------  */
-   StateMachine(); // 
+   thermalControl(); // The whole thermal management happens in here
 
    //If we chose to send CAN messages every 100 ms, do this here.
    if (Param::GetInt(Param::canperiod) == CAN_PERIOD_100MS)
@@ -225,25 +151,6 @@ static void Ms200Task(void)
 }
 
 
-
-
-
-
-
-void exti0_isr(void)
-{
-	exti_line_state = GPIOA_IDR;
-
-	//if ((exti_line_state & (1 << 0)) != 0) 
-   if (exti_get_flag_status(EXTI8))
-   {
-		Param::SetInt(Param::octo_pos, 100);
-	} else {
-		
-	}
-
-	exti_reset_request(EXTI8);
-}
 
 static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) // Called when a defined CAN message is received.
 {
@@ -295,6 +202,7 @@ void Param::Change(Param::PARAM_NUM paramNum)
 
    case Param::nodeid:
       canSdo->SetNodeId(Param::GetInt(Param::nodeid)); //Set node ID for SDO access
+      //can->RegisterUserMessage(0x600 + Param::GetInt(Param::nodeid)); // Dynamic CanSDO request COB-ID (0x600 + Node-ID)
       break;
 
    default:
@@ -303,11 +211,62 @@ void Param::Change(Param::PARAM_NUM paramNum)
    }
 }
 
+
 //Whichever timer(s) you use for the scheduler, you have to
 //implement their ISRs here and call into the respective scheduler
 extern "C" void tim3_isr(void)
 {
    scheduler->Run();
+}
+
+// Octovalve encoder
+extern "C" void exti9_5_isr(void) {
+    if (exti_get_flag_status(EXTI8)) {
+        if (Valve::valve_turning_direction == CLOCKWISE) {
+            octovalve_position++;
+        } else {
+            octovalve_position--;
+        }
+        exti_reset_request(EXTI8);
+    }
+}
+
+// Waterpump PWM duty feedback 
+extern "C" void tim4_isr(void) {
+    if (timer_get_flag(TIM4, TIM_SR_CC3IF)) {  // Pump_BATT CH3
+        uint32_t now = timer_get_ic_value(TIM4, TIM_IC3);  // CCR3
+        static uint32_t last_rise = 0;
+        static enum tim_ic_pol current_pol = TIM_IC_RISING;
+        if (current_pol == TIM_IC_RISING) {
+            pump_batt_period = now - last_rise;  // From previous rising
+            last_rise = now;
+            current_pol = TIM_IC_FALLING;
+            timer_ic_set_polarity(TIM4, TIM_IC3, TIM_IC_FALLING);
+        } else {
+            pump_batt_high_time = now - last_rise;
+            current_pol = TIM_IC_RISING;
+            timer_ic_set_polarity(TIM4, TIM_IC3, TIM_IC_RISING);
+            pump_batt_ready = true;
+        }
+        timer_clear_flag(TIM4, TIM_SR_CC3IF);
+    }
+    if (timer_get_flag(TIM4, TIM_SR_CC4IF)) {  // Pump_PT CH4
+        uint32_t now = timer_get_ic_value(TIM4, TIM_IC4);  // CCR4
+        static uint32_t last_rise_b = 0;
+        static enum tim_ic_pol current_pol_b = TIM_IC_RISING;
+        if (current_pol_b == TIM_IC_RISING) {
+            pump_pt_period = now - last_rise_b;
+            last_rise_b = now;
+            current_pol_b = TIM_IC_FALLING;
+            timer_ic_set_polarity(TIM4, TIM_IC4, TIM_IC_FALLING);
+        } else {
+            pump_pt_high_time = now - last_rise_b;
+            current_pol_b = TIM_IC_RISING;
+            timer_ic_set_polarity(TIM4, TIM_IC4, TIM_IC_RISING);
+            pump_pt_ready = true;
+        }
+        timer_clear_flag(TIM4, TIM_SR_CC4IF);
+    }
 }
 
 extern "C" int main(void)
@@ -324,12 +283,9 @@ extern "C" int main(void)
 
    write_bootloader_pininit(); //Instructs boot loader to initialize certain pins
 
-   nvic_setup(); //Set up some interrupts
-   parm_load(); //Load stored parameters
-   tim_setup(); 
-   exti_setup();
-   spi1_setup();   //spi 1 used for External ADC
-   usart3_setup(); // used for LIN communication
+   nvic_setup();  // Set up some interrupts
+   parm_load();   // Load stored parameters
+   tim_setup();
 
    Terminal t(USART1, termCmds);
    terminal = &t;
@@ -350,13 +306,12 @@ extern "C" int main(void)
    CanSdo sdo(&c, &cm);
    canSdo = &sdo;
    canSdo->SetNodeId(Param::GetInt(Param::nodeid)); //Set node ID for SDO access e.g. by wifi module
-   
-   LinBus l(USART3, 19200);
-   lin = &l;
+   SdoCommands::SetCanMap(canMap);
+
    
    Stm32Scheduler s(TIM3); //We never exit main so it's ok to put it on stack
    // manually set to different frequency to have finer control over task duration.
-   timer_set_prescaler(TIM3, (2 * rcc_apb1_frequency) / 200000 - 1); //timer now has 5us ticks instead of 10us. leading to 0.5ms granularity in tasklength
+   timer_set_prescaler(TIM3, (2 * rcc_apb1_frequency) / 200000 - 1); //timer now has 5us ticks instead of 10us. thus 0.5ms granularity in tasklength
 
    scheduler = &s;
 
@@ -366,26 +321,37 @@ extern "C" int main(void)
    s.AddTask(Ms100Task, 200); // 100ms actual
    s.AddTask(Ms200Task, 400); // 200ms actual
 
-   adc.begin();
 
    Param::SetInt(Param::version, 0);
    Param::Change(Param::PARAM_LAST); //Call callback one for general parameter propagation
 
-   DigIo::exp_sleep.Set(); // dont put stepper drivers to sleep
    delay_ms(10);
    Valve::expansionCalibrateAll();
-
 
    while(1)
    {
       char c = 0;
-      terminal->Run();  
+      CanSdo::SdoFrame* sdoFrame = sdo.GetPendingUserspaceSdo();
+      terminal->Run();
+
       if (canSdo->GetPrintRequest() == PRINT_JSON)
       {
-         TerminalCommands::PrintParamsJson(&sdo, &c);
+         TerminalCommands::PrintParamsJson(canSdo, &c);
+      }
+      if (0 != sdoFrame)
+      {
+         CanSdo::SdoFrame sdoOrig = *sdoFrame;
+         SdoCommands::ProcessStandardCommands(sdoFrame);
+
+         //if (sdoFrame->cmd == SDO_ABORT)
+         //{
+         //   *sdoFrame = sdoOrig;
+         //   ProcessCustomSdoCommands(sdoFrame);
+         //}
+
+         sdo.SendSdoReply(sdoFrame);
       }
    }
-
 
    return 0;
 }

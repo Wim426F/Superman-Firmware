@@ -1,3 +1,23 @@
+/*
+ * This file is part of the Superman heatpump controller project.
+ *
+ * Copyright (C) 2025 Wim Boone <wim.boone@outlook.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
 #include "interface.h"
 
 
@@ -5,6 +25,7 @@
 void Interface::handle730(uint32_t data[2])  //params
 {
    uint8_t* bytes = (uint8_t*)data;// this converts the two 32bit array into bytes
+
 }
 
 void Interface::handle731(uint32_t data[2])  // Setpoints and actual temperatures
@@ -16,18 +37,16 @@ void Interface::handle731(uint32_t data[2])  // Setpoints and actual temperature
     if(Param::GetInt(Param::canio) == _canio::CAN_IO)
     {
         // sensor values
-        Param::SetFloat(Param::temp_battery,   (float)(bytes[0]) - 50);
-        Param::SetFloat(Param::temp_cabin_left,   (float)(bytes[2]) - 50);
-        Param::SetFloat(Param::temp_cabin_right,   (float)(bytes[4]) - 50);   
+        Param::SetFloat(Param::temp_battery,   (float)(bytes[0]) - 40); 
 
         const Param::Attributes *pAtr = Param::GetAttrib((Param::temp_battery_setp));
         Param::SetFloat(Param::temp_battery_setp,   (float)utils::limitVal(bytes[1], FP_TOINT(pAtr->min), FP_TOINT(pAtr->max)));
 
-        pAtr = Param::GetAttrib((Param::temp_cabinl_setp));
-        Param::SetFloat(Param::temp_cabinl_setp,   (float)utils::limitVal(bytes[3], FP_TOINT(pAtr->min), FP_TOINT(pAtr->max)));
+        pAtr = Param::GetAttrib((Param::temp_evaporator_setp));
+        Param::SetFloat(Param::temp_evaporator_setp,   (float)utils::limitVal(bytes[3], FP_TOINT(pAtr->min), FP_TOINT(pAtr->max)));
 
-        pAtr = Param::GetAttrib((Param::temp_cabinr_setp));
-        Param::SetFloat(Param::temp_cabinr_setp,   (float)utils::limitVal(bytes[5], FP_TOINT(pAtr->min), FP_TOINT(pAtr->max)));
+        pAtr = Param::GetAttrib((Param::temp_condensor_setp));
+        Param::SetFloat(Param::temp_condensor_setp,   (float)utils::limitVal(bytes[5], FP_TOINT(pAtr->min), FP_TOINT(pAtr->max)));
     }
 }
 
@@ -39,9 +58,9 @@ void Interface::SendMessages(CanHardware* can)
     int32_t speed = Param::GetInt(Param::compressor_speed);
     
     //Heat pump manifold values 1
-    bytes[0] = Param::GetInt(Param::temp_inlet_compressor) + 50;
-    bytes[1] = Param::GetInt(Param::temp_outlet_compressor) + 50;
-    bytes[2] = Param::GetInt(Param::temp_pre_evaporator) + 50;
+    bytes[0] = Param::GetInt(Param::temp_inlet_compressor) + 40;
+    bytes[1] = Param::GetInt(Param::temp_outlet_compressor) + 40;
+    bytes[2] = Param::GetInt(Param::temp_pre_evaporator) + 40;
     bytes[3] = Param::GetInt(Param::pressure_inlet_compressor) * 5;
     bytes[4] = Param::GetInt(Param::pressure_outlet_compressor) * 5;
     bytes[5] = Param::GetInt(Param::pressure_pre_evaporator) * 5;
@@ -50,12 +69,12 @@ void Interface::SendMessages(CanHardware* can)
     can->Send(0x732, (uint32_t*)bytes,8); // every 100ms
 
     //Heat pump manifold values 2
-    bytes[0] = Param::GetInt(Param::temp_inlet_battery) + 50;
-    bytes[1] = Param::GetInt(Param::temp_inlet_powertrain) + 50;
-    bytes[2] = Param::GetInt(Param::temp_reservoir) + 50;
-    bytes[3] = 50;  // pt outlet temp
-    bytes[4] = Param::GetInt(Param::radiator_pwm) + 50;
-    bytes[5] = Param::GetInt(Param::shutterservo) + 50;
+    bytes[0] = Param::GetInt(Param::temp_inlet_battery) + 40;
+    bytes[1] = Param::GetInt(Param::temp_inlet_powertrain) + 40;
+    bytes[2] = Param::GetInt(Param::reservoir_level);
+    bytes[3] = 40;  // pt outlet temp
+    bytes[4] = Param::GetInt(Param::radiatorfan_pwm) + 40;
+    //bytes[5] = Param::GetInt(Param::shutterservo) + 40;
     bytes[6] = Param::GetInt(Param::octo_pos);
     bytes[7] = utils::change(speed, 800,8000, 20,250);
     can->Send(0x733, (uint32_t*)bytes,8); // every 100ms

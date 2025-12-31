@@ -1,3 +1,22 @@
+/*
+ * This file is part of the Superman heatpump controller project.
+ *
+ * Copyright (C) 2025 Wim Boone <wim.boone@outlook.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "valves.h"
 #include <libopencm3/cm3/systick.h>
 #include <algorithm>
@@ -12,17 +31,31 @@ bool calibration_active = false; // calibration takes a while, so meanwhile must
 int octo_currentpos = 0;
 int oct0_pulses = 0;
 
+const int TOTAL_PULSES = 1000;  // Verify later, FIXME
+const int BAND_SIZE = TOTAL_PULSES / 5;  // 200
+const int TOLERANCE = 5;
+const int pos_centers[] = {0, 100, 300, 500, 700, 900};  // Index 0 unused; centers for bands
+
+volatile int current_pos = 0;  // From EXTI ISR
+volatile enum OctoPos target_pos = POS1;
+volatile bool in_transit = false;
+volatile uint32_t command_start_ms = 0;  // For stall timeout
+const uint32_t STALL_TIMEOUT_MS = 2000;
+
+
 bool pulse = true;
+bool Valve::valve_turning_direction = true;
 
 DigIo* Valve::pin_dir = nullptr;
 DigIo* Valve::pin_en = nullptr;
 DigIo* Valve::pin_step = nullptr;
 
+
 bool Valve::getPins(int valve)
 {
     switch (valve)
     {
-        case EXPV_RECIRCULATION:
+        case EXPV_EVAPORATOR_RECIRC:
             pin_dir = &DigIo::exp1_dir;
             pin_en = &DigIo::exp1_en;
             pin_step = &DigIo::exp1_step;
@@ -162,11 +195,13 @@ int Valve::octoSetPos(int set_position)
 	{
 		if(set_position > octo_currentpos) // Move clockwise
 		{
+            valve_turning_direction = CLOCKWISE;
 			DigIo::octo_in1.Set();
 			DigIo::octo_in2.Clear();
 		}
 		if (set_position < octo_currentpos) // Move counterclockwise
 		{
+            valve_turning_direction = COUNTERCLOCKWISE;
 			DigIo::octo_in1.Clear();
 			DigIo::octo_in2.Set();
 		}
@@ -176,11 +211,6 @@ int Valve::octoSetPos(int set_position)
 
 int Valve::octoGetPos()
 {
-	// Octovalve
-//	if (timer_get_flag(TIM1, TIM_SR_CC1IF))
-//	{
-//	   float octo_pos = timer_get_ic_value(TIM1, TIM_IC1);
-//	   Param::SetFloat(Param::octo_pos, octo_pos);
-//	}
+
 	return 0;
 }

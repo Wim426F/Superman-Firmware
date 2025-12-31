@@ -8,6 +8,7 @@
 #include "params.h"
 #include "digio.h"
 #include <libopencm3/stm32/rtc.h>
+#include <libopencm3/stm32/timer.h>
 #include "canhardware.h"
 #include "anain.h"
 
@@ -25,7 +26,7 @@ namespace utils
     double naturalLog(double x, int n);
 }
 
-static void write_pwm(uint32_t timer_peripheral, uint32_t oc_id, uint32_t value); // range is 0-2000
+extern void pwm_write(uint8_t duty_pct, uint32_t tim, enum tim_oc_id oc, uint32_t arr); // 0-100%
 
 static void delay_us(int64_t FLASH_DELAY)
 {

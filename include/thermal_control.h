@@ -9,7 +9,7 @@
 #include "pumps.h"
 #include "valves.h"
 
-void StateMachine();
+void thermalControl();
 
 
 #endif // STATEMACHINE_H

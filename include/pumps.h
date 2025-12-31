@@ -7,11 +7,6 @@
 #include "digio.h"
 #include "utils.h"
 #include "hwinit.h"
-//#include "drv8316.h"
-
-//extern DRV8316Driver waterpumpA;
-//extern DRV8316Driver waterpumpB;
-
 
 class Compressor
 {
@@ -26,8 +21,8 @@ public:
 class Waterpump
 {
 public:
-    static void batterySetFlow(int lpm);
-    static void powertrainSetFlow(int lpm);
+    static void batterySetDuty(uint8_t duty); // duty in %
+    static void powertrainSetDuty(uint8_t duty); // duty in %
     static float batteryGetFlow();
     static float powertrainGetFlow();
 };

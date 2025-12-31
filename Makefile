@@ -38,20 +38,20 @@ LDSCRIPT	  = linker.ld
 LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -Wl,--gc-sections,-Map,linker.map
 OBJSL		  = main.o hwinit.o stm32scheduler.o params.o terminal.o terminal_prj.o \
              my_string.o digio.o sine_core.o my_fp.o printf.o anain.o \
-             param_save.o errormessage.o stm32_can.o canhardware.o canmap.o cansdo.o \
+             param_save.o errormessage.o stm32_can.o canhardware.o canmap.o cansdo.o sdocommands.o \
              picontroller.o terminalcommands.o valves.o pumps.o sensors.o utils.o \
-			 interface.o temp_meas.o Ewma.o MCP3208.o statemachine.o linbus.o
+			 interface.o temp_meas.o Ewma.o thermal_control.o 
 
 OBJS     = $(patsubst %.o,obj/%.o, $(OBJSL))
 DEPENDS = $(patsubst %.o,obj/%.d, $(OBJSL))
 vpath %.c src/ libopeninv/src
 vpath %.cpp src/ libopeninv/src
 
-OPENOCD_BASE	= /usr
-OPENOCD		= $(OPENOCD_BASE)/bin/openocd
-OPENOCD_SCRIPTS	= $(OPENOCD_BASE)/share/openocd/scripts
-OPENOCD_FLASHER	= $(OPENOCD_SCRIPTS)/interface/parport.cfg
-OPENOCD_BOARD	= $(OPENOCD_SCRIPTS)/board/olimex_stm32_h103.cfg
+OPENOCD_BASE	= /c/openocd
+OPENOCD = $(OPENOCD_BASE)/bin/openocd.exe
+OPENOCD_SCRIPTS = $(OPENOCD_BASE)/share/openocd/scripts
+OPENOCD_FLASHER	= $(OPENOCD_SCRIPTS)/interface/stlink.cfg
+OPENOCD_BOARD	= $(OPENOCD_SCRIPTS)/target/stm32f1x.cfg
 
 # Be silent per default, but 'make V=1' will show all compiler calls.
 ifneq ($(V),1)

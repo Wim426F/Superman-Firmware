@@ -1,13 +1,25 @@
+/*
+ * This file is part of the Superman heatpump controller project.
+ *
+ * Copyright (C) 2025 Wim Boone <wim.boone@outlook.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "pumps.h"
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/rcc.h>
-
-#define DRV_OFF 1      //Enable Motor Drive
-
-uint8_t drv_address = 0x0;
-int flag1 = 0;
-int8_t rxLen = 0;
-int8_t len = 0;
 
 void Compressor::handle2A8(uint32_t data[2])
 {
@@ -38,11 +50,11 @@ void Compressor::handle2A8(uint32_t data[2])
 
     // Extract Input HV Current
     uint16_t current_raw = ((bytes[4] >> 1) | ((bytes[5] & 0x01) << 7)); // 9 bits
-    Param::SetFloat(Param::compressor_amps, current_raw * 0.1);
+    //Param::SetFloat(Param::compressor_amps, current_raw * 0.1);
 
     // Extract Input HV Voltage
     uint16_t voltage_raw = ((bytes[5] >> 1) | (bytes[6] << 7)) & 0x7FF; // 11 bits
-    Param::SetFloat(Param::compressor_HV, voltage_raw * 0.5);
+    //Param::SetFloat(Param::compressor_HV, voltage_raw * 0.5);
 
     // Extract States
     bool powerLimitActive = bytes[6] & 0x80;
@@ -172,18 +184,18 @@ int Compressor::GetDuty()
     return Param::GetInt(Param::compressor_duty);
 }
 
-void Waterpump::batterySetFlow(int lpm)
+void Waterpump::batterySetDuty(uint8_t duty) // in %
 {
-    //waterpumpA.Control.setSpeed(lpm); // hex:ABCD
-    //waterpumpA.getStatus();
-    
+    duty = utils::limitVal(duty, 0, 80); // driver doesnt seem to work above 80%
+    duty *= 10;
+    pwm_write(duty, PWM_PUMP_BATT_TIM, PWM_PUMP_BATT_OC, PWM_PUMP_BATT_ARR);
 }
 
-void Waterpump::powertrainSetFlow(int lpm)
+void Waterpump::powertrainSetDuty(uint8_t duty) // in %
 {
-    //waterpumpB.Control.setSpeed(5000);
-//    waterpumpA.getStatus();
-
+    duty = utils::limitVal(duty, 0, 80); // driver doesnt seem to work above 80%
+    duty *= 10;
+    pwm_write(duty, PWM_PUMP_PT_TIM, PWM_PUMP_PT_OC, PWM_PUMP_PT_ARR);
 }
 
 float Waterpump::batteryGetFlow()

@@ -44,7 +44,7 @@ float temp_ptin_offset = 0;
 float temp_reserv_offset = 0;
 
 
-void GetTemps()
+void GetSensorReadings()
 {
     float pps1 = (float)AnaIn::pressure_inlet_compressor.Get(); // low side sensor
     float pps2 = (float)AnaIn::pressure_outlet_compressor.Get(); // high side sensor
@@ -54,6 +54,10 @@ void GetTemps()
     pps1 = utils::changeFloat(pps1, 590, 4096, 0, LOWPRESSURE_SENSOR); // low side sensor
     pps2 = utils::changeFloat(pps2, 370, 4096, 0, HIGHPRESSURE_SENSOR); // high side sensor
     pps3 = utils::changeFloat(pps3, 590, 4096, 0, LOWPRESSURE_SENSOR); // low side sensor
+
+    pps1 = utils::limitVal(pps1, 0, LOWPRESSURE_SENSOR);
+    pps2 = utils::limitVal(pps2, 0, HIGHPRESSURE_SENSOR);
+    pps3 = utils::limitVal(pps3, 0, LOWPRESSURE_SENSOR);
 
     Param::SetFloat(Param::pressure_inlet_compressor,   ps1_filter.filter(pps1)); // low side sensor
     Param::SetFloat(Param::pressure_outlet_compressor,  ps2_filter.filter(pps2)); // high side sensor
@@ -66,12 +70,10 @@ void GetTemps()
 
     Param::SetFloat(Param::temp_inlet_battery,      battin_filter.filter( TempMeas::Lookup(AnaIn::temp_inlet_battery.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_battin_offset);
     Param::SetFloat(Param::temp_inlet_powertrain,   ptinfilter.filter   ( TempMeas::Lookup(AnaIn::temp_inlet_powertrain.Get()  , TempMeas::TEMP_TESLA_10K) ) - temp_ptin_offset);
-    Param::SetFloat(Param::temp_reservoir,          reserv_filter.filter( TempMeas::Lookup(AnaIn::temp_reservoir.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_reserv_offset);
+    Param::SetFloat(Param::reservoir_level,          reserv_filter.filter( TempMeas::Lookup(AnaIn::reservoir_level.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_reserv_offset);
 
-    Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(TempMeas::Lookup(adc.analogRead(0), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_ambient,        ambient_filter.filter(TempMeas::Lookup(adc.analogRead(1), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_cabin_left,     cabin_left_filter.filter(TempMeas::Lookup(adc.analogRead(2), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_cabin_right,    cabin_right_filter.filter(TempMeas::Lookup(adc.analogRead(3), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_battery,        battery_filter.filter(TempMeas::Lookup(adc.analogRead(4), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_powertrain,     powertrain_filter.filter(TempMeas::Lookup(adc.analogRead(5), TempMeas::TEMP_TESLA_10K)));
+    Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(TempMeas::Lookup(AnaIn::temp_radiator.Get(), TempMeas::TEMP_TESLA_10K)));
+    Param::SetFloat(Param::temp_ambient,        ambient_filter.filter(TempMeas::Lookup(AnaIn::temp_ambient.Get(), TempMeas::TEMP_TESLA_10K)));
+    Param::SetFloat(Param::temp_battery,        battery_filter.filter(TempMeas::Lookup(AnaIn::temp_battery.Get(), TempMeas::TEMP_TESLA_10K)));
+    Param::SetFloat(Param::temp_powertrain,     powertrain_filter.filter(TempMeas::Lookup(AnaIn::temp_powertrain.Get(), TempMeas::TEMP_TESLA_10K)));
 }

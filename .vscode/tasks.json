@@ -1,0 +1,51 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Project",
+            "type": "shell",
+            "command": "make",
+            "args": ["all"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+                    "args": ["-c"]
+                }
+            }
+        },
+        {
+            "label": "Clean Project",
+            "type": "shell",
+            "command": "make",
+            "args": ["clean"],
+            "problemMatcher": ["$gcc"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                    "args": ["-c"]
+                }
+            }
+        },
+        {
+            "label": "Flash Project",
+            "type": "shell",
+            "command": "make",
+            "args": ["flash"],
+            "problemMatcher": ["$gcc"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                    "args": ["-c"]
+                }
+            }
+        }
+    ]
+}

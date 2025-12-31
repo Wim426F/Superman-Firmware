@@ -25,8 +25,6 @@
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/dma.h>
-#include <libopencm3/stm32/i2c.h>
-#include <libopencm3/stm32/spi.h>
 #include <libopencm3/stm32/rtc.h>
 #include <libopencm3/stm32/crc.h>
 #include <libopencm3/stm32/flash.h>
@@ -55,7 +53,6 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_GPIOE);
 
    rcc_periph_clock_enable(RCC_USART1);
-   rcc_periph_clock_enable(RCC_USART3); // LIN Comms
 
    rcc_periph_clock_enable(RCC_TIM1); // Octovalve encoder
    rcc_periph_clock_enable(RCC_TIM2); // PWM outputs
@@ -68,7 +65,11 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_CRC);
    rcc_periph_clock_enable(RCC_AFIO); // CAN
    rcc_periph_clock_enable(RCC_CAN1); // CAN
-   rcc_periph_clock_enable(RCC_SPI1); // SPI for external ADC
+
+   // Remap
+   AFIO_MAPR |= AFIO_MAPR_TIM1_REMAP_FULL_REMAP;     // CH2=PE11 for solenoid
+   AFIO_MAPR |= AFIO_MAPR_TIM2_REMAP_PARTIAL_REMAP2; // CH4=PB11 for fan
+   
 }
 
 /* Some pins should never be left floating at any time
@@ -90,7 +91,7 @@ void write_bootloader_pininit()
    //Here we specify that PC13 be initialized to ON
    //AND C13 AND C14 be initialized to OFF
    commands.pindef[0].port = GPIOC;
-   commands.pindef[0].pin = GPIO13 | GPIO14; // octovalve pin 1 and 2
+   commands.pindef[0].pin = GPIO3 | GPIO4; // octovalve pin 1 and 2
    commands.pindef[0].inout = PIN_OUT;
    commands.pindef[0].level = 0;
 
@@ -114,35 +115,6 @@ void write_bootloader_pininit()
    }
 }
 
-void spi1_setup()   //spi 1 used for External ADC
-{
-   spi_init_master(SPI1, SPI_CR1_BAUDRATE_FPCLK_DIV_32, SPI_CR1_CPOL_CLK_TO_0_WHEN_IDLE,
-                   SPI_CR1_CPHA_CLK_TRANSITION_1, SPI_CR1_DFF_8BIT, SPI_CR1_MSBFIRST);
-   spi_set_standard_mode(SPI1,0);//set mode 0
-
-   spi_enable_software_slave_management(SPI1);
-   //spi_enable_ss_output(SPI1);
-   spi_set_nss_high(SPI1);
-   gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO7 | GPIO5);//MOSI , CLK
-   gpio_set_mode(GPIOA, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, GPIO6);//MISO
-   spi_enable(SPI1);
-}
-
-void usart3_setup(void) // For LIN
-{
-   /* Setup GPIO pin GPIO_USART3_TX and GPIO_USART3_RX. */
-   gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_50_MHZ,
-                 GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO_USART3_TX);
-   gpio_set_mode(GPIOB, GPIO_MODE_INPUT,
-                 GPIO_CNF_INPUT_FLOAT, GPIO_USART3_RX);
-   usart_set_baudrate(USART3, 19200);
-   usart_set_databits(USART3, 8);
-   usart_set_stopbits(USART3, USART_STOPBITS_1);
-   usart_set_mode(USART3, USART_MODE_TX_RX);
-   usart_set_parity(USART3, USART_PARITY_NONE);
-   usart_set_flow_control(USART3, USART_FLOWCONTROL_NONE);
-   usart_enable(USART3);
-}
 
 /**
 * Enable Timer refresh and break interrupts
@@ -151,8 +123,14 @@ void nvic_setup(void)
 {
    nvic_enable_irq(NVIC_TIM3_IRQ); //Scheduler
    nvic_set_priority(NVIC_TIM3_IRQ, 0); //Highest priority
-   //nvic_set_priority(NVIC_TIM2_IRQ, 0xe << 4); //second lowest priority
-   //nvic_enable_irq(NVIC_EXTI0_IRQ); // interrupt for octovalve encoder
+
+   // Enable capture interrupts waterpump feedback
+   nvic_enable_irq(NVIC_TIM4_IRQ);
+   nvic_set_priority(NVIC_TIM4_IRQ, 1);  // Medium prio
+
+   // Octovalve pulse counter
+   nvic_enable_irq(NVIC_EXTI9_5_IRQ);  // For EXTI8 (5-9 shared)
+   nvic_set_priority(NVIC_EXTI9_5_IRQ, 2);  // Medium prio
 }
 
 void rtc_setup()
@@ -171,52 +149,45 @@ void tim_setup()
    // RCC_TIM3  Scheduler
    // RCC_TIM4  Waterpumps PWM input/output
 
-   gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ, // Low speed (only need 1khz)
-                 GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO2 | GPIO3); // pwm_servo & pwm_fan
-   
-   // Timer 2
+   /*-----------------------------------------------------*/
+   /*                  PWM OUTPUTS                        */
+   /*-----------------------------------------------------*/
+
+
+   // TIM1 setup for 20 kHz solenoid_gate (CH2 PE11)
+   timer_disable_counter(TIM1);
+   timer_set_prescaler(TIM1, 0);
+   timer_set_alignment(TIM1, TIM_CR1_CMS_EDGE);
+   timer_set_period(TIM1, 3599);  // 72 MHz / 3600 = 20 kHz
+   timer_enable_preload(TIM1);
+
+   gpio_set_mode(GPIOE, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO11);  // PE11=CH2
+
+   timer_set_oc_mode(TIM1, TIM_OC2, TIM_OCM_PWM1);
+   timer_enable_oc_preload(TIM1, TIM_OC2);
+   timer_set_oc_polarity_high(TIM1, TIM_OC2);
+   timer_enable_oc_output(TIM1, TIM_OC2);
+   timer_set_oc_value(TIM1, TIM_OC2, 0);  // 0% init
+
+   timer_enable_counter(TIM1);
+
+   // Timer 2 (PWM outputs, 100 Hz)
    timer_disable_counter(TIM2);
-   timer_set_alignment(TIM2, TIM_CR1_CMS_EDGE); //edge aligned PWM
+   timer_set_prescaler(TIM2, PWM_FAN_PSC);  // 10
+   timer_set_alignment(TIM2, TIM_CR1_CMS_EDGE);
+   timer_set_period(TIM2, PWM_FAN_ARR);     // 65535
    timer_enable_preload(TIM2);
-   timer_set_oc_mode(TIM2, PWM_FAN,    TIM_OCM_PWM2); 
-   timer_set_oc_mode(TIM2, PWM_SERVO,  TIM_OCM_PWM2); 
-
-   timer_enable_oc_preload(TIM2, PWM_FAN);
-   timer_enable_oc_preload(TIM2, PWM_SERVO);
-
-   timer_set_oc_polarity_high(TIM2, PWM_FAN);
-   timer_set_oc_polarity_high(TIM2, PWM_SERVO);
-
-   timer_enable_oc_output(TIM2, PWM_FAN);
-   timer_enable_oc_output(TIM2, PWM_SERVO);
-
-   timer_set_period(TIM2, 2100); // 1khz?
-
-   timer_enable_counter(TIM2);
-
-
-
-   /*-----------------------------------------------------*/
-   /*    Pulse counting for octovalve position feedback   */
-   /*-----------------------------------------------------*/
    
-   //We want the timer to run at 1MHz = 72MHz/72
-   //Prescaler is div-1 => 71
-   timer_set_prescaler(TIM1, 71); //run at 1 MHz
-   timer_set_period(TIM1, 65535); // Timer period in the auto-reload register.
-   timer_slave_set_mode(TIM1, TIM_SMCR_SMS_RM);
-   //timer_slave_set_polarity(TIM1, TIM_ET_RISING);
-   //timer_slave_set_trigger(TIM1, TIM_SMCR_TS_TI1FP1);
-   //
-   //timer_ic_set_filter(TIM1, TIM_IC1, TIM_IC_DTF_DIV_32_N_8);
-   //timer_ic_set_input(TIM1, TIM_IC1, TIM_IC_IN_TI1);//measure octovalve encoder, input capture channel 1
-   //timer_set_oc_polarity_high(TIM1, TIM_OC1);
-   //timer_ic_enable(TIM1, TIM_IC1);
-   //timer_generate_event(TIM1, TIM_EGR_UG);
-   //timer_enable_counter(TIM1); 
-   /*
-   * Setup timer for measuring waterpump PWM feedback
-   */
+   gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO3);
+   
+   // Radiator fan
+   timer_set_oc_mode(TIM2, PWM_FAN_OC, TIM_OCM_PWM1);
+   timer_enable_oc_preload(TIM2, PWM_FAN_OC);
+   timer_set_oc_polarity_high(TIM2, PWM_FAN_OC);
+   timer_enable_oc_output(TIM2, PWM_FAN_OC);
+   timer_set_oc_value(TIM2, PWM_FAN_OC, 0);  // 0% init (fan off)
+   
+   timer_enable_counter(TIM2);
 
 
    /*-------------------------------------------------*/
@@ -230,26 +201,34 @@ void tim_setup()
    timer_slave_set_polarity(TIM4, TIM_ET_FALLING);
    timer_slave_set_trigger(TIM4, TIM_SMCR_TS_TI1FP1);
 
-   timer_ic_set_filter(TIM4, PWMIN_PUMPA_CH, TIM_IC_DTF_DIV_32_N_8);
-   timer_ic_set_filter(TIM4, PWMIN_PUMPB_CH, TIM_IC_DTF_DIV_32_N_8);
+   // Waterpump battery
+   timer_ic_set_filter(TIM4, TIM_IC3, TIM_IC_DTF_DIV_32_N_8);
+   timer_ic_set_input(TIM4, TIM_IC3, TIM_IC_IN_TI3);  // TI3 on PB8
+   timer_ic_set_polarity(TIM4, PWMIN_PUMP_BATT_CH, TIM_IC_RISING);
+   timer_ic_enable(TIM4, PWMIN_PUMP_BATT_CH);
 
-   timer_ic_set_input(TIM4, PWMIN_PUMPA_CH, TIM_IC_IN_TI1); // measure waterpumpA PWM, input capture channel 3
-   timer_ic_set_input(TIM4, PWMIN_PUMPB_CH, TIM_IC_IN_TI1); // measure waterpumpB PWM, input capture channel 4
+   // Waterpump powertrain
+   timer_ic_set_filter(TIM4, TIM_IC4, TIM_IC_DTF_DIV_32_N_8);
+   timer_ic_set_input(TIM4, TIM_IC4, TIM_IC_IN_TI4);  // TI4 on PB9
+   timer_ic_set_polarity(TIM4, PWMIN_PUMP_PT_CH, TIM_IC_RISING);
+   timer_ic_enable(TIM4, PWMIN_PUMP_PT_CH);
 
-   timer_ic_set_polarity(TIM4, PWMIN_PUMPA_CH, TIM_IC_RISING);
-   timer_ic_set_polarity(TIM4, PWMIN_PUMPB_CH, TIM_IC_RISING);
+   // Waterpump battery 1 kHz PWM
+   gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO6);
+   timer_set_oc_mode(TIM4, PWM_PUMP_BATT_OC, TIM_OCM_PWM1);
+   timer_enable_oc_preload(TIM4, PWM_PUMP_BATT_OC);
+   timer_set_oc_polarity_high(TIM4, PWM_PUMP_BATT_OC);
+   timer_enable_oc_output(TIM4, PWM_PUMP_BATT_OC);
+   timer_set_oc_value(TIM4, PWM_PUMP_BATT_OC, 0);  // 0% init (no flow)
 
-   timer_ic_enable(TIM4, PWMIN_PUMPA_CH);
-   timer_ic_enable(TIM4, PWMIN_PUMPB_CH);
+   // Waterpump powertrain 1 kHz PWM
+   gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO7);
+   timer_set_oc_mode(TIM4, PWM_PUMP_PT_OC, TIM_OCM_PWM1);
+   timer_enable_oc_preload(TIM4, PWM_PUMP_PT_OC);
+   timer_set_oc_polarity_high(TIM4, PWM_PUMP_PT_OC);
+   timer_enable_oc_output(TIM4, PWM_PUMP_PT_OC);
+   timer_set_oc_value(TIM4, PWM_PUMP_PT_OC, 0);  // 0% init (no flow)
 
    timer_generate_event(TIM4, TIM_EGR_UG);
    timer_enable_counter(TIM4);
 }
-
-void exti_setup(void)
-{
-	exti_select_source(EXTI8, GPIOA);
-	exti_set_trigger(EXTI8, EXTI_TRIGGER_RISING);
-	exti_enable_request(EXTI8);
-}
-

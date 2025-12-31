@@ -50,8 +50,9 @@ double naturalLog(double x, int n) {
 } // namespace utils
 
 
-static void write_pwm(uint32_t timer_peripheral, enum tim_oc_id oc_id, uint32_t value)
-{
-   value = utils::change(value, 0, 2000, 2085, 0);
-   timer_set_oc_value(timer_peripheral, oc_id, value); //duty.    1500=28%,      1000 = 52%,     500 = 76%
+void pwm_write(uint8_t duty_pct, uint32_t tim, enum tim_oc_id oc, uint32_t arr) {
+    if (duty_pct > 100) duty_pct = 100;
+    uint32_t ccr = ((uint64_t)duty_pct * (arr + 1UL)) / 100UL;
+    if (ccr > arr) ccr = arr;
+    timer_set_oc_value(tim, oc, ccr);
 }

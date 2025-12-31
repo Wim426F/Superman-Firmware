@@ -6,11 +6,8 @@
 #include "digio.h"
 #include "utils.h"
 #include "temp_meas.h"
-#include "MCP3208.h"
 
-extern MCP3208 adc;
-
-void GetTemps();
+void GetSensorReadings();
 
 
 #endif // SENSORS_H
