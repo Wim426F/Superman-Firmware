@@ -9,17 +9,18 @@
 */
 
 #define DIG_IO_LIST \
-    DIG_IO_ENTRY(octo_pulse,            GPIOA, GPIO8,  PinMode::INPUT_FLT)      \
+    DIG_IO_ENTRY(octo_pulse,            GPIOA, GPIO8,  PinMode::INPUT_FLT)   \
     DIG_IO_ENTRY(exp3_dir,              GPIOA, GPIO15, PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(preheat_req,           GPIOB, GPIO2,  PinMode::INPUT_PD)      \
+    DIG_IO_ENTRY(reservoir_level,       GPIOB, GPIO1,  PinMode::INPUT_PU)    \
+    DIG_IO_ENTRY(preheat_req,           GPIOB, GPIO2,  PinMode::INPUT_PD)    \
     DIG_IO_ENTRY(exp2_dir,              GPIOB, GPIO3,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp2_step,             GPIOB, GPIO4,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp2_en,               GPIOB, GPIO5,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(pwm_pump_battery,      GPIOB, GPIO6,  PinMode::OUTPUT_ALT)      \
-    DIG_IO_ENTRY(pwm_pump_powertrain,   GPIOB, GPIO7,  PinMode::OUTPUT_ALT)      \
-    DIG_IO_ENTRY(pump_battery_fb,       GPIOB, GPIO8,  PinMode::INPUT_FLT)      \
-    DIG_IO_ENTRY(pump_powertrain_fb,    GPIOB, GPIO9,  PinMode::INPUT_FLT)      \
-    DIG_IO_ENTRY(pwm_fan,               GPIOB, GPIO11, PinMode::OUTPUT_ALT)      \
+    DIG_IO_ENTRY(pwm_pump_battery,      GPIOB, GPIO6,  PinMode::OUTPUT_ALT)  \
+    DIG_IO_ENTRY(pwm_pump_powertrain,   GPIOB, GPIO7,  PinMode::OUTPUT_ALT)  \
+    DIG_IO_ENTRY(pump_battery_fb,       GPIOB, GPIO8,  PinMode::INPUT_FLT)   \
+    DIG_IO_ENTRY(pump_powertrain_fb,    GPIOB, GPIO9,  PinMode::INPUT_FLT)   \
+    DIG_IO_ENTRY(pwm_fan,               GPIOB, GPIO11, PinMode::OUTPUT_ALT)  \
     DIG_IO_ENTRY(led_out,               GPIOB, GPIO14, PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp3_step,             GPIOC, GPIO0,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp3_en,               GPIOC, GPIO1,  PinMode::OUTPUT)      \
@@ -37,9 +38,9 @@
     DIG_IO_ENTRY(exp1_dir,              GPIOE, GPIO2,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp1_step,             GPIOE, GPIO3,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp1_en,               GPIOE, GPIO4,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(cabin_heatr,           GPIOE, GPIO8,  PinMode::INPUT_PD)      \
-    DIG_IO_ENTRY(cabin_cool,            GPIOE, GPIO9,  PinMode::INPUT_PD)      \
-    DIG_IO_ENTRY(cabin_heatl,           GPIOE, GPIO10, PinMode::INPUT_PD)      \
+    DIG_IO_ENTRY(cabin_heatr,           GPIOE, GPIO8,  PinMode::INPUT_PD)    \
+    DIG_IO_ENTRY(cabin_cool,            GPIOE, GPIO9,  PinMode::INPUT_PD)    \
+    DIG_IO_ENTRY(cabin_heatl,           GPIOE, GPIO10, PinMode::INPUT_PD)    \
     DIG_IO_ENTRY(valve_lcc,             GPIOE, GPIO11, PinMode::OUTPUT)      \
 
 /*

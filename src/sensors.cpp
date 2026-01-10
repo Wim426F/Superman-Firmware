@@ -70,8 +70,7 @@ void GetSensorReadings()
 
     Param::SetFloat(Param::temp_inlet_battery,      battin_filter.filter( TempMeas::Lookup(AnaIn::temp_inlet_battery.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_battin_offset);
     Param::SetFloat(Param::temp_inlet_powertrain,   ptinfilter.filter   ( TempMeas::Lookup(AnaIn::temp_inlet_powertrain.Get()  , TempMeas::TEMP_TESLA_10K) ) - temp_ptin_offset);
-    Param::SetFloat(Param::reservoir_level,          reserv_filter.filter( TempMeas::Lookup(AnaIn::reservoir_level.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_reserv_offset);
-
+    
     Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(TempMeas::Lookup(AnaIn::temp_radiator.Get(), TempMeas::TEMP_TESLA_10K)));
     Param::SetFloat(Param::temp_ambient,        ambient_filter.filter(TempMeas::Lookup(AnaIn::temp_ambient.Get(), TempMeas::TEMP_TESLA_10K)));
     Param::SetFloat(Param::temp_battery,        battery_filter.filter(TempMeas::Lookup(AnaIn::temp_battery.Get(), TempMeas::TEMP_TESLA_10K)));

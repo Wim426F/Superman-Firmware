@@ -85,8 +85,6 @@
    VALUE_ENTRY(temp_battery,                "°C",      2024 ) \
    VALUE_ENTRY(temp_powertrain,             "°C",      2025 ) \
    VALUE_ENTRY(reservoir_level,             "dig",     2026 ) \
-   VALUE_ENTRY(potmeter_cabinl,             "dig",     2027 ) \
-   VALUE_ENTRY(potmeter_cabinr,             "dig",     2028 ) \
    VALUE_ENTRY(cool_cabin,                  ONOFF,     2029 ) \
    VALUE_ENTRY(heat_cabinl,                 ONOFF,     2030 ) \
    VALUE_ENTRY(heat_cabinr,                 ONOFF,     2031 ) \
