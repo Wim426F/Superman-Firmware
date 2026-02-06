@@ -38,40 +38,41 @@
  * IDs are 16 bit, so 65535 is the maximum
  */
 
- //Define a version string of your firmware here
-#define VER 0.4.Superman
-#define name superman
+#define VERSION 0.5.superman
 
 /* Entries must be ordered as follows:
    1. Saveable parameters (id != 0)
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 14
-//Next value Id: 2044
+//Next param id (increase when adding new parameter!): 12
+//Next value Id: 2049
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
-   PARAM_ENTRY(CAT_COMM,    canspeed,              CANSPEEDS,    0,      4,       2,       0   ) \
-   PARAM_ENTRY(CAT_COMM,    canperiod,             CANPERIODS,   0,      1,       0,       1   ) \
-   PARAM_ENTRY(CAT_COMM,    nodeid,                "",           1,      63,      50,      2   ) \
-   PARAM_ENTRY(CAT_COMM,    canio,                 CANIO,        0,      1,       0,       3   ) \
-   PARAM_ENTRY(CAT_CTRL,    temp_battery_setp,     "°C",        -30,     100,     20,      4  ) \
-   PARAM_ENTRY(CAT_CTRL,    temp_battery_min,      "°C",        -30,     100,     0,       5  ) \
-   PARAM_ENTRY(CAT_CTRL,    temp_battery_max,      "°C",        -30,     100,     50,      6  ) \
-   PARAM_ENTRY(CAT_CTRL,    temp_powertrain_min,   "°C",        -30,     100,     0,       7  ) \
-   PARAM_ENTRY(CAT_CTRL,    temp_powertrain_max,   "°C",        -30,     100,     50,      8  ) \
-   PARAM_ENTRY(CAT_CTRL,    temp_evaporator_setp,  "°C",        -30,     100,     5,       9  ) \
-   PARAM_ENTRY(CAT_CTRL,    temp_condensor_setp,   "°C",        -30,     100,     70,      10  ) \
-   PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      10000,   6000,    11  ) \
-   VALUE_ENTRY(octo_pos,                    OCTOPOS,   2005)  \
-   VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2006)  \
-   VALUE_ENTRY(expv_recirculation ,         "dig",     2007) \
+   PARAM_ENTRY(CAT_COMM,    canspeed,              CANSPEEDS,    0,      4,       2,       0  ) \
+   PARAM_ENTRY(CAT_COMM,    nodeid,                "",           1,      63,      50,      1  ) \
+   PARAM_ENTRY(CAT_COMM,    canio,                 CANIO,        0,      1,       0,       2  ) \
+   PARAM_ENTRY(CAT_CTRL,    temp_battery_setp,     "°C",        -30,     100,     20,      3  ) \
+   PARAM_ENTRY(CAT_CTRL,    temp_battery_min,      "°C",        -30,     100,     0,       4  ) \
+   PARAM_ENTRY(CAT_CTRL,    temp_battery_max,      "°C",        -30,     100,     50,      5  ) \
+   PARAM_ENTRY(CAT_CTRL,    temp_powertrain_min,   "°C",        -30,     100,     0,       6  ) \
+   PARAM_ENTRY(CAT_CTRL,    temp_powertrain_max,   "°C",        -30,     100,     50,      7  ) \
+   PARAM_ENTRY(CAT_CTRL,    temp_evaporator_setp,  "°C",        -30,     100,     5,       8  ) \
+   PARAM_ENTRY(CAT_CTRL,    temp_condensor_setp,   "°C",        -30,     100,     70,      9  ) \
+   PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      10000,   6000,    10 ) \
+   VALUE_ENTRY(octovalve_position,          OCTOPOS,   2005 ) \
+   VALUE_ENTRY(octovalve_setpoint,          OCTOPOS,   2044 ) \
+   VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2046 ) \
+   VALUE_ENTRY(best_sink,                 BEST_SINK,   2047 ) \
+   VALUE_ENTRY(best_source,             BEST_SOURCE,   2048 ) \
+   VALUE_ENTRY(thermal_demands,     THERMAL_DEMANDS,   2045 ) \
+   VALUE_ENTRY(expv_recirculation ,         "dig",     2007 ) \
    VALUE_ENTRY(expv_condensor_coolant,      "dig",     2008 ) \
    VALUE_ENTRY(expv_condensor_cabinr ,      "dig",     2009 ) \
    VALUE_ENTRY(expv_condensor_cabinl ,      "dig",     2010 ) \
    VALUE_ENTRY(expv_evaporator_coolant,     "dig",     2011 ) \
    VALUE_ENTRY(expv_evaporator_cabin ,      "dig",     2012 ) \
-   VALUE_ENTRY(valve_lcc,                   "dig",     2013 ) \
+   VALUE_ENTRY(valve_coolant_condensor,     OPEN_CLOSE,2013 ) \
    VALUE_ENTRY(pressure_inlet_compressor,   "bar",     2014 ) \
    VALUE_ENTRY(pressure_outlet_compressor,  "bar",     2015 ) \
    VALUE_ENTRY(pressure_pre_evaporator,     "bar",     2016 ) \
@@ -100,21 +101,25 @@
    VALUE_ENTRY(compressor_temp,             "°C",      2041 ) \
    VALUE_ENTRY(compressor_power,            "W",       2042 ) \
    VALUE_ENTRY(radiatorfan_pwm,             "%",       2043 ) \
-   VALUE_ENTRY(opmode,                      OPMODES,   2000   ) \
-   VALUE_ENTRY(version,                     VERSTR,    2001   ) \
-   VALUE_ENTRY(lasterr,                     errorListString,  2002 ) \
-   VALUE_ENTRY(uaux,                        "V",       2003   ) \
-   VALUE_ENTRY(cpuload,                     "%",       2004   )
+   VALUE_ENTRY(opmode,                      OPMODES,   2000 ) \
+   VALUE_ENTRY(version,                     VERSTR,    2001 ) \
+   VALUE_ENTRY(lasterr,                     errorListString,2002 ) \
+   VALUE_ENTRY(uaux,                        "V",       2003 ) \
+   VALUE_ENTRY(cpuload,                     "%",       2004 )
 
 
 /***** Enum String definitions *****/
+#define VERSTR STRINGIFY(4=VERSION)
+
 #define OPMODES            "0=Off, 1=Run, 2=Preheat"
 #define CANSPEEDS          "0=125k, 1=250k, 2=500k, 3=800k, 4=1M"
-#define OCTOPOS            "0=Unknown, 1=Series, 2=Series, 3=Ambient Source, 4=Radiator Bypass, 5=Parallel"
-#define HEAT_TRNSFR_MODE   "0=Passive Transfer, 1=Active Transfer"
+#define OCTOPOS            "0=Unknown, 1=Series, 2=Series, 3=AmbientSource, 4=RadiatorBypass, 5=Parallel"
+#define HEAT_TRNSFR_MODE   "0=Passive, 1=DominantHeating, 2=DominantCooling"
+#define BEST_SINK          "0=Ambient, 1=Battery"
+#define BEST_SOURCE        "0=Ambient, 1=Battery, 2=Recirculation"
+#define THERMAL_DEMANDS    "0=None, 1=CoolCabin, 2=CoolBattery, 4=CoolPowertrain, 8=HeatCabinL, 16=HeatCabinR, 32=HeatBattery, 64=RadiatorDefrost"
 #define NTC                "0=JCurve, 1=KTY81-110, 2=KTY83-110, 3=KTY84-130, 4=Tesla_100K, 5=Tesla_10K, 6=PT1000"
-#define CANPERIODS         "0=100ms, 1=10ms"
-#define SOLENOID           "0=Open, 1=Closed"
+#define OPEN_CLOSE         "0=Open, 1=Closed"
 #define CANIO              "0=HW-IO, 1=CAN-IO"
 #define HWIO_SRC           "0=Ext1, 1=Ext2, 2=Ext3, 3=Ext4"
 #define ONOFF              "0=Off, 1=On, 2=na"
@@ -122,7 +127,7 @@
 #define CAT_COMM           "Communication"
 #define CAT_CTRL           "Interface"
 
-#define VERSTR STRINGIFY(4=VER-name)
+
 
 /***** enums ******/
 
@@ -156,6 +161,39 @@ enum OctoPos
 	POS4_RBYPASS = 4,  // Battery and powertrain in series, Cool battery and powertrain, Exclude radiator, Reject heat to cabin
 	POS5_PARALLEL = 5  // Battery and powertrain separate, Cool battery with a/c, Powertrain heat to radiator, Reject heat from battery or cabin to radiator
 };
+
+enum HeatTransferMode
+{
+   PASSIVE = 0,
+   DOMINANT_HEATING = 1,
+   DOMINANT_COOLING = 2
+};
+
+enum BestSink
+{
+   BESTSINK_AMBIENT = 0,
+   BESTSINK_BATTERY = 1
+};
+
+enum BestSource
+{
+   BESTSOURCE_AMBIENT = 0,
+   BESTSOURCE_BATTERY = 1,
+   BESTSOURCE_RECIRCULATION = 2
+};
+
+enum _ThermalDemands
+{
+   NONE = 0,
+   COOLING_CABIN = 1,
+   COOLING_BATTERY = 2,
+   COOLING_POWERTRAIN = 4,
+   HEATING_CABINL = 8,
+   HEATING_CABINR = 16,
+   HEATING_BATTERY = 32,
+   RADIATOR_DEFROST = 64
+};
+
 
 //Generated enum-string for possible errors
 extern const char* errorListString;

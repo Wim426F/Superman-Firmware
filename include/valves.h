@@ -30,8 +30,8 @@ public:
     static void expansionRunSteps(); // takes steps in a non blocking way, must be called every 2ms
     static void expansionCalibrateAll();
 
-    static void solenoidOpen();
-    static void solenoidClose();
+    static void coolantCondensorOpen();
+    static void coolantCondensorClose();
 
     static int octoSetPos(int set_position);
     static int octoGetPos();

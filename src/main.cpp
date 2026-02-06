@@ -106,14 +106,9 @@ static void Ms10Task(void)
    Param::SetInt(Param::cool_cabin, DigIo::cabin_cool.Get());
    Param::SetInt(Param::preheat_req, DigIo::preheat_req.Get());
 
-   Param::SetInt(Param::pump_battery_duty, GetBatteryPumpDuty());
-   Param::SetInt(Param::pump_powertrain_duty, GetPowertrainPumpDuty());
-   Param::SetInt(Param::octo_pos, octovalve_position);
-
-
-   //If we chose to send CAN messages every 10 ms, do this here.
-   if (Param::GetInt(Param::canperiod) == CAN_PERIOD_10MS)
-      canMap->SendAll();
+   //Param::SetInt(Param::pump_battery_duty, GetBatteryPumpDuty());
+   //Param::SetInt(Param::pump_powertrain_duty, GetPowertrainPumpDuty());
+   Param::SetInt(Param::octovalve_position, octovalve_position);
 }
 
 
@@ -139,8 +134,7 @@ static void Ms100Task(void)
    thermalControl(); // The whole thermal management happens in here
 
    //If we chose to send CAN messages every 100 ms, do this here.
-   if (Param::GetInt(Param::canperiod) == CAN_PERIOD_100MS)
-      canMap->SendAll();
+   canMap->SendAll();
 }
 
 
@@ -202,7 +196,6 @@ void Param::Change(Param::PARAM_NUM paramNum)
 
    case Param::nodeid:
       canSdo->SetNodeId(Param::GetInt(Param::nodeid)); //Set node ID for SDO access
-      //can->RegisterUserMessage(0x600 + Param::GetInt(Param::nodeid)); // Dynamic CanSDO request COB-ID (0x600 + Node-ID)
       break;
 
    default:
@@ -342,13 +335,6 @@ extern "C" int main(void)
       {
          CanSdo::SdoFrame sdoOrig = *sdoFrame;
          SdoCommands::ProcessStandardCommands(sdoFrame);
-
-         //if (sdoFrame->cmd == SDO_ABORT)
-         //{
-         //   *sdoFrame = sdoOrig;
-         //   ProcessCustomSdoCommands(sdoFrame);
-         //}
-
          sdo.SendSdoReply(sdoFrame);
       }
    }

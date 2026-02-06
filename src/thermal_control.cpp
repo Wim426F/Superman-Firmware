@@ -72,9 +72,10 @@ struct SinkData {
     ThermalComponent info;
 };
 
+
 // Evaluate thermal demands based on temperature setpoints
 ThermalDemands assessDemands() {
-    ThermalDemands demands;
+    ThermalDemands demands = {false, false, false, false, false, false, false};
 
     // Cabin demands from digital inputs
     demands.cabinLHeating = Param::GetBool(Param::heat_cabinl);
@@ -82,15 +83,28 @@ ThermalDemands assessDemands() {
     demands.cabinCooling = Param::GetBool(Param::cool_cabin);
 
     // Battery and powertrain demands are automatic
-    float batteryTemp = Param::GetInt(Param::temp_battery);
+    int batteryTemp = Param::GetInt(Param::temp_battery);
     demands.batteryHeating = batteryTemp < Param::GetInt(Param::temp_battery_min);
     demands.batteryCooling = batteryTemp > Param::GetInt(Param::temp_battery_max);
 
-    float powertrainTemp = Param::GetInt(Param::temp_powertrain);
+    int powertrainTemp = Param::GetInt(Param::temp_powertrain);
     demands.powertrainCooling = powertrainTemp > Param::GetInt(Param::temp_powertrain_max);
 
-    // If radiator coolant returns much cooler coolant than ambient it might we choking (freezing itself in)
+    // If radiator coolant returns much cooler coolant than ambient it might we choking (freezing itself in) TODO
     //demands.radiatorDefrost = (heating && Param::GetInt(Param::temp_radiator) < Param::GetInt(Param::temp_ambient) -5 && Compressor::GetDuty() > 80);
+    demands.radiatorDefrost = false;  // Initialize to false for now
+
+    int thermal_demands = 0;
+
+    thermal_demands |= demands.cabinCooling ? COOLING_CABIN : NONE;
+    thermal_demands |= demands.batteryCooling ? COOLING_BATTERY : NONE;
+    thermal_demands |= demands.powertrainCooling ? COOLING_POWERTRAIN : NONE;
+    thermal_demands |= demands.cabinLHeating ? HEATING_CABINL : NONE;
+    thermal_demands |= demands.cabinRHeating ? HEATING_CABINR : NONE;
+    thermal_demands |= demands.batteryHeating ? HEATING_BATTERY : NONE;
+    thermal_demands |= demands.radiatorDefrost ? RADIATOR_DEFROST : NONE;
+    
+    Param::SetInt(Param::thermal_demands, thermal_demands);
 
     return demands;
 }
@@ -163,9 +177,9 @@ void getAvailableSourcesSinks(const ThermalDemands& demands, SourceData sources[
     float recircTemp = Param::GetInt(Param::temp_outlet_compressor); //FIXME not correct!
 
     // Sources – always available when physically present
-    sources[1] = {SourceType::BATTERY, {!demands.batteryHeating, batteryTemp}}; // Can't source heat from battery if it needs heating
-    sources[2] = {SourceType::AMBIENT, {true, ambientTemp}}; // Always a heat source
-    sources[3] = {SourceType::RECIRCULATION, {true, recircTemp}}; // Always a heat source (COP=1, compressor energy to heat)
+    sources[0] = {SourceType::BATTERY, {!demands.batteryHeating, batteryTemp}}; // Can't source heat from battery if it needs heating
+    sources[1] = {SourceType::AMBIENT, {true, ambientTemp}}; // Always a heat source
+    sources[2] = {SourceType::RECIRCULATION, {true, recircTemp}}; // Always a heat source (COP=1, compressor energy to heat)
 
     // Sinks – availability based on demand (user wants to use it as heat sink)
     sinks[0] = {SinkType::BATTERY, {!demands.batteryCooling, batteryTemp}}; // Battery is heatsink unless it needs cooling
@@ -178,7 +192,7 @@ SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
     float minDeltaT = std::numeric_limits<float>::max(); // Start with highest float to ensure first delta updates min
 
     // Check each source for smallest temp difference (hottest source)
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         if (sources[i].info.available) {
             float deltaT = targetTemp - sources[i].info.temp; // Calc delta to rank sources
             if (deltaT < minDeltaT) {
@@ -192,6 +206,7 @@ SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
     if (Param::GetInt(Param::temp_ambient) < RECIRC_TEMP_THRESHOLD)
         bestSource = SourceType::RECIRCULATION;
 
+    Param::SetInt(Param::best_source, (int)bestSource);
     return bestSource;
 }
 
@@ -210,6 +225,7 @@ SinkType selectBestSink(float targetTemp, const SinkData sinks[2]) {
             }
         }
     }
+    Param::SetInt(Param::best_sink, (int)bestSink);
     return bestSink;
 }
 
@@ -302,32 +318,38 @@ void thermalControl() {
 
 
     // Dominant cooling
-    if ((demands.batteryCooling && demands.powertrainCooling) || (demands.cabinCooling && bestSink == SinkType::AMBIENT) || (demands.cabinLHeating || demands.cabinRHeating && bestSource == SourceType::BATTERY))
+    if (    (demands.batteryCooling && demands.powertrainCooling)
+        ||  (demands.cabinCooling && bestSink == SinkType::AMBIENT) 
+        ||  ((demands.cabinLHeating || demands.cabinRHeating) && bestSource == SourceType::BATTERY)
+       )
         Valve::octoSetPos(OctoPos::POS2_SERIES);   // Condensor -> Radiator -> Evaporator -> Battery -> Powertrain
         // Condensor dumps heat to radiator. Evaporator cools battery and powertrain. Cabin can be cooled by dumping heat to radiator, cabin can also be heated from battery and powertrain.
         // i.e. this mode is for when battery&powertrain and/or cabin needs cooling
 
     // Dominant heating
-    if ((demands.cabinLHeating || demands.cabinRHeating || demands.batteryHeating) && bestSource == SourceType::AMBIENT)
+    else if (((demands.cabinLHeating || demands.cabinRHeating || demands.batteryHeating) && bestSource == SourceType::AMBIENT)
+            ||(demands.cabinCooling && bestSink == SinkType::BATTERY))
         Valve::octoSetPos(OctoPos::POS3_AMBIENT);  // {Condensor -> Battery -> Powertrain}  +  {Evaporator -> Radiator}
         // Evaporator takes heat from ambient. Condensor CAN heat battery and/or cabin. Powertrain passively cooled
 
     // Dominant heating
-    if ((demands.cabinLHeating || demands.cabinRHeating || demands.batteryHeating) && bestSource == SourceType::RECIRCULATION) 
+    else if ((demands.cabinLHeating || demands.cabinRHeating || demands.batteryHeating) && bestSource == SourceType::RECIRCULATION)
         Valve::octoSetPos(OctoPos::POS4_RBYPASS);  // Condensor -> Evaporator -> Battery -> Powertrain
         // Only when too cold. i.e. when selectBestSource returns self heat as most efficient mode
         // Can heat cabin and battery, also takes in wasteheat from powertrain
 
     // Dominant cooling
-    if (demands.cabinCooling || demands.batteryCooling && !demands.batteryHeating && bestSink == SinkType::AMBIENT)
+    else if ((demands.cabinCooling || demands.batteryCooling) && !demands.batteryHeating && bestSink == SinkType::AMBIENT)
         Valve::octoSetPos(OctoPos::POS5_PARALLEL); // {Condensor -> Radiator -> Powertrain}  +  {Evaporator -> Battery}
         // Powertrain passive cooling only. Condensor CAN reject heat from cabin and evaporator CAN cool battery
         // i.e. this mode is only for cabin and/or battery active cooling, no powertrain active cooling
-
+    
 
     // Dominant heating mode
-    if (demands.cabinLHeating || demands.cabinRHeating || demands.batteryHeating && !demands.cabinCooling)
+    if (demands.cabinLHeating || demands.cabinRHeating || (demands.batteryHeating && !demands.cabinCooling))
     {
+        Param::SetInt(Param::heat_transfer_mode, DOMINANT_HEATING);
+
         float setpoint = Param::GetInt(Param::temp_condensor_setp);
         float measured = Param::GetInt(Param::temp_outlet_compressor);
         uint8_t controlOutput = runPiControl(setpoint, measured);
@@ -342,7 +364,7 @@ void thermalControl() {
         
         // Evaporators are sources
         // Condensors valves are for flow dividing
-        Valve::solenoidClose(); // Coolant condensor low restriction valve. only use when no flow sharing is needed.
+        Valve::coolantCondensorClose(); // Coolant condensor low restriction valve. only use when no flow sharing is needed.
         Valve::expansionSetPos(EXPV_CONDENSOR_COOLANT, coolant);
         Valve::expansionSetPos(EXPV_CONDENSOR_CABINR, cabinR);
         Valve::expansionSetPos(EXPV_CONDENSOR_CABINL, cabinL);
@@ -355,6 +377,8 @@ void thermalControl() {
     // Dominant cooling mode
     else if (demands.cabinCooling || demands.batteryCooling || demands.powertrainCooling)
     {
+        Param::SetInt(Param::heat_transfer_mode, DOMINANT_COOLING);
+
         float setpoint = Param::GetInt(Param::temp_evaporator_setp);
         float measured = Param::GetInt(Param::temp_inlet_compressor);
         uint8_t controlOutput = runPiControl(setpoint, measured);
@@ -366,7 +390,7 @@ void thermalControl() {
         adjustEvaporatorSplit(cabin, coolant, compressorDuty);
 
         // Condensors are sinks
-        Valve::solenoidOpen(); // Open the coolant condensor low restriction valve
+        Valve::coolantCondensorOpen(); // Open the coolant condensor low restriction valve
         Valve::expansionSetPos(EXPV_CONDENSOR_COOLANT, 0); // for cooling any loop we reject through the coolant condensor
         Valve::expansionSetPos(EXPV_CONDENSOR_CABINR, 0); // Cabin as sink means cabin heating which is handled in heating mode already.
         Valve::expansionSetPos(EXPV_CONDENSOR_CABINL, 0);
@@ -378,8 +402,9 @@ void thermalControl() {
     }
     // Idle
     else {
+        Param::SetInt(Param::heat_transfer_mode, PASSIVE);
         // Set all valves open to not block compressor when starting up the next time.
-        Valve::solenoidOpen(); // Release/open the coolant condensor low restriction valve
+        Valve::coolantCondensorOpen(); // open the coolant condensor low restriction valve
         Valve::expansionSetPos(EXPV_CONDENSOR_COOLANT, 255);
         Valve::expansionSetPos(EXPV_CONDENSOR_CABINR, 255);
         Valve::expansionSetPos(EXPV_CONDENSOR_CABINL, 255);

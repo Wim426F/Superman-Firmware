@@ -175,21 +175,22 @@ void Valve::expansionCalibrateAll()
 
 
 
-void Valve::solenoidOpen()
+void Valve::coolantCondensorOpen()
 {
     DigIo::valve_lcc.Clear();
-	Param::SetInt(Param::valve_lcc, 0);
+	Param::SetInt(Param::valve_coolant_condensor, 0);
 }
 
-void Valve::solenoidClose()
+void Valve::coolantCondensorClose()
 {
     DigIo::valve_lcc.Set();
-	Param::SetInt(Param::valve_lcc, 1);
+	Param::SetInt(Param::valve_coolant_condensor, 1);
 }
 
 int Valve::octoSetPos(int set_position)
-{
-	octo_currentpos = Param::GetInt(Param::octo_pos);
+{   
+    Param::SetInt(Param::octovalve_setpoint, set_position);
+	octo_currentpos = Param::GetInt(Param::octovalve_position);
 
 	if (octo_currentpos != set_position)
 	{

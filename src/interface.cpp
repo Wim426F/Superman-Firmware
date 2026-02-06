@@ -54,28 +54,27 @@ void Interface::handle731(uint32_t data[2])  // Setpoints and actual temperature
 void Interface::SendMessages(CanHardware* can)
 {
     uint8_t bytes[8];
-    Param::SetInt(Param::compressor_speed, 800);
     int32_t speed = Param::GetInt(Param::compressor_speed);
-    
+
     //Heat pump manifold values 1
-    bytes[0] = Param::GetInt(Param::temp_inlet_compressor) + 40;
-    bytes[1] = Param::GetInt(Param::temp_outlet_compressor) + 40;
-    bytes[2] = Param::GetInt(Param::temp_pre_evaporator) + 40;
-    bytes[3] = Param::GetInt(Param::pressure_inlet_compressor) * 5;
-    bytes[4] = Param::GetInt(Param::pressure_outlet_compressor) * 5;
-    bytes[5] = Param::GetInt(Param::pressure_pre_evaporator) * 5;
-    bytes[6] = Param::GetInt(Param::pump_battery_flow) * 10;
-    bytes[7] = Param::GetInt(Param::pump_powertrain_flow) * 10;
+    bytes[0] = utils::limitVal(Param::GetInt(Param::temp_inlet_compressor) + 40, 0, 255);
+    bytes[1] = utils::limitVal(Param::GetInt(Param::temp_outlet_compressor) + 40, 0, 255);
+    bytes[2] = utils::limitVal(Param::GetInt(Param::temp_pre_evaporator) + 40, 0, 255);
+    bytes[3] = utils::limitVal(Param::GetInt(Param::pressure_inlet_compressor) * 5, 0, 255);
+    bytes[4] = utils::limitVal(Param::GetInt(Param::pressure_outlet_compressor) * 5, 0, 255);
+    bytes[5] = utils::limitVal(Param::GetInt(Param::pressure_pre_evaporator) * 5, 0, 255);
+    bytes[6] = utils::limitVal(Param::GetInt(Param::pump_battery_flow) * 10, 0, 255);
+    bytes[7] = utils::limitVal(Param::GetInt(Param::pump_powertrain_flow) * 10, 0, 255);
     can->Send(0x732, (uint32_t*)bytes,8); // every 100ms
 
     //Heat pump manifold values 2
-    bytes[0] = Param::GetInt(Param::temp_inlet_battery) + 40;
-    bytes[1] = Param::GetInt(Param::temp_inlet_powertrain) + 40;
-    bytes[2] = Param::GetInt(Param::reservoir_level);
+    bytes[0] = utils::limitVal(Param::GetInt(Param::temp_inlet_battery) + 40, 0, 255);
+    bytes[1] = utils::limitVal(Param::GetInt(Param::temp_inlet_powertrain) + 40, 0, 255);
+    bytes[2] = utils::limitVal(Param::GetInt(Param::reservoir_level), 0, 255);
     bytes[3] = 40;  // pt outlet temp
-    bytes[4] = Param::GetInt(Param::radiatorfan_pwm) + 40;
+    bytes[4] = utils::limitVal(Param::GetInt(Param::radiatorfan_pwm) + 40, 0, 255);
     //bytes[5] = Param::GetInt(Param::shutterservo) + 40;
-    bytes[6] = Param::GetInt(Param::octo_pos);
-    bytes[7] = utils::change(speed, 800,8000, 20,250);
+    bytes[6] = utils::limitVal(Param::GetInt(Param::octovalve_position), 0, 255);
+    bytes[7] = utils::limitVal(utils::change(speed, 800,8000, 20,250), 0, 255);
     can->Send(0x733, (uint32_t*)bytes,8); // every 100ms
 }

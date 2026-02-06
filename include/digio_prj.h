@@ -22,11 +22,11 @@
     DIG_IO_ENTRY(pump_powertrain_fb,    GPIOB, GPIO9,  PinMode::INPUT_FLT)   \
     DIG_IO_ENTRY(pwm_fan,               GPIOB, GPIO11, PinMode::OUTPUT_ALT)  \
     DIG_IO_ENTRY(led_out,               GPIOB, GPIO14, PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(exp3_step,             GPIOC, GPIO0,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(exp3_en,               GPIOC, GPIO1,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(exp4_dir,              GPIOC, GPIO2,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(octo_in1,              GPIOC, GPIO3,  PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(octo_in2,              GPIOC, GPIO4,  PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(exp3_step,             GPIOC, GPIO10, PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(exp3_en,               GPIOC, GPIO11, PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(exp4_dir,              GPIOC, GPIO12, PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(octo_in1,              GPIOC, GPIO13, PinMode::OUTPUT)      \
+    DIG_IO_ENTRY(octo_in2,              GPIOC, GPIO14, PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp4_step,             GPIOD, GPIO0,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp4_en,               GPIOD, GPIO1,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp5_dir,              GPIOD, GPIO2,  PinMode::OUTPUT)      \

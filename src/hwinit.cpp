@@ -177,9 +177,9 @@ void tim_setup()
    timer_set_alignment(TIM2, TIM_CR1_CMS_EDGE);
    timer_set_period(TIM2, PWM_FAN_ARR);     // 65535
    timer_enable_preload(TIM2);
-   
-   gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO3);
-   
+
+   gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO11);
+
    // Radiator fan
    timer_set_oc_mode(TIM2, PWM_FAN_OC, TIM_OCM_PWM1);
    timer_enable_oc_preload(TIM2, PWM_FAN_OC);
@@ -195,7 +195,7 @@ void tim_setup()
    /*-------------------------------------------------*/
    timer_disable_counter(TIM4);
    timer_set_prescaler(TIM4, 71); //run at 1 MHz
-   timer_set_period(TIM4, 65535);
+   timer_set_period(TIM4, 999);  // 1 MHz / 1000 = 1 kHz PWM
    timer_direction_up(TIM4);
    timer_slave_set_mode(TIM4, TIM_SMCR_SMS_RM);
    timer_slave_set_polarity(TIM4, TIM_ET_FALLING);
