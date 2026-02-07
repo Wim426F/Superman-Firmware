@@ -31,16 +31,16 @@
 #define PWM_FAN_ARR     65535U  // Max res for granular duty (72 MHz / (11 * 65536) ≈ 100 Hz)
 #define PWM_FAN_PSC     10U     // Divides to ~6.55 MHz effective clock for ~100 Hz
 
-// Pumps (TIM4 CH1/2 PB6/7, ~1 kHz)
+// Pumps (TIM4 CH1/2 PB6/7, 10 Hz - allows 12-135Hz input capture without overflow)
 #define PWM_PUMP_BATT_TIM   TIM4
 #define PWM_PUMP_BATT_OC    TIM_OC1  // PB6
-#define PWM_PUMP_BATT_ARR   999U     // 1000 ticks @ 1 MHz = 1 kHz
-#define PWM_PUMP_BATT_PSC   71U      // Shared w/ inputs (1 MHz clock for PWM meas.)
+#define PWM_PUMP_BATT_ARR   50000U   // 50000 ticks @ 500 kHz = 10 Hz (allows 12-135Hz input)
+#define PWM_PUMP_BATT_PSC   143U     // 72MHz/(143+1) = 500kHz, 2µs/tick
 
 #define PWM_PUMP_PT_TIM   TIM4
 #define PWM_PUMP_PT_OC    TIM_OC2  // PB7
-#define PWM_PUMP_PT_ARR   999U
-#define PWM_PUMP_PT_PSC   71U 
+#define PWM_PUMP_PT_ARR   50000U     // 50000 ticks @ 500 kHz = 10 Hz
+#define PWM_PUMP_PT_PSC   143U 
 
 // Solenoid Gate (TIM1 CH2 PE11, 20 kHz: Fast switching for refrigerant control)
 #define PWM_SOLENOID_TIM   TIM1

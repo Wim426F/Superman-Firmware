@@ -63,24 +63,11 @@ static Terminal* terminal;
 
 
 volatile int octovalve_position = 0;
-volatile uint32_t pump_batt_high_time = 0, pump_batt_period = 0;
-volatile uint32_t pump_pt_high_time = 0, pump_pt_period = 0;
+volatile uint32_t pump_batt_period = 0;
+volatile uint32_t pump_pt_period = 0;
 volatile bool pump_batt_ready = false, pump_pt_ready = false;
 
 
-float GetBatteryPumpDuty() {
-    if (!pump_batt_ready) return 0.0f;
-    pump_batt_ready = false;
-    if (pump_batt_period == 0) return 0.0f;
-    return (float)pump_batt_high_time / pump_batt_period * 100.0f;
-}
-
-float GetPowertrainPumpDuty() {
-    if (!pump_pt_ready) return 0.0f;
-    pump_pt_ready = false;
-    if (pump_pt_period == 0) return 0.0f;
-    return (float)pump_pt_high_time / pump_pt_period * 100.0f;
-}
 
 static void Ms1_5Task(void) // used for step drivers, 1.5ms interval for step pulse is very critical!
 {
@@ -106,8 +93,9 @@ static void Ms10Task(void)
    Param::SetInt(Param::cool_cabin, DigIo::cabin_cool.Get());
    Param::SetInt(Param::preheat_req, DigIo::preheat_req.Get());
 
-   //Param::SetInt(Param::pump_battery_duty, GetBatteryPumpDuty());
-   //Param::SetInt(Param::pump_powertrain_duty, GetPowertrainPumpDuty());
+   // Set pump RPM feedback (repurposing flow parameters for RPM)
+   Param::SetInt(Param::pump_battery_flow, (int)Waterpump::batteryGetFlow());
+   Param::SetInt(Param::pump_powertrain_flow, (int)Waterpump::powertrainGetFlow());
    Param::SetInt(Param::octovalve_position, octovalve_position);
 }
 
@@ -224,40 +212,42 @@ extern "C" void exti9_5_isr(void) {
     }
 }
 
-// Waterpump PWM duty feedback 
+// Waterpump PWM frequency feedback
+// Measures period between rising edges to calculate frequency and RPM
 extern "C" void tim4_isr(void) {
+    const uint32_t TIMER_PERIOD = 50000;  // TIM4 period
+
     if (timer_get_flag(TIM4, TIM_SR_CC3IF)) {  // Pump_BATT CH3
         uint32_t now = timer_get_ic_value(TIM4, TIM_IC3);  // CCR3
         static uint32_t last_rise = 0;
-        static enum tim_ic_pol current_pol = TIM_IC_RISING;
-        if (current_pol == TIM_IC_RISING) {
-            pump_batt_period = now - last_rise;  // From previous rising
-            last_rise = now;
-            current_pol = TIM_IC_FALLING;
-            timer_ic_set_polarity(TIM4, TIM_IC3, TIM_IC_FALLING);
-        } else {
-            pump_batt_high_time = now - last_rise;
-            current_pol = TIM_IC_RISING;
-            timer_ic_set_polarity(TIM4, TIM_IC3, TIM_IC_RISING);
+
+        if (last_rise != 0) {
+            // Handle timer wraparound
+            if (now >= last_rise) {
+                pump_batt_period = now - last_rise;
+            } else {
+                pump_batt_period = (TIMER_PERIOD - last_rise) + now;
+            }
             pump_batt_ready = true;
         }
+        last_rise = now;
         timer_clear_flag(TIM4, TIM_SR_CC3IF);
     }
+
     if (timer_get_flag(TIM4, TIM_SR_CC4IF)) {  // Pump_PT CH4
         uint32_t now = timer_get_ic_value(TIM4, TIM_IC4);  // CCR4
-        static uint32_t last_rise_b = 0;
-        static enum tim_ic_pol current_pol_b = TIM_IC_RISING;
-        if (current_pol_b == TIM_IC_RISING) {
-            pump_pt_period = now - last_rise_b;
-            last_rise_b = now;
-            current_pol_b = TIM_IC_FALLING;
-            timer_ic_set_polarity(TIM4, TIM_IC4, TIM_IC_FALLING);
-        } else {
-            pump_pt_high_time = now - last_rise_b;
-            current_pol_b = TIM_IC_RISING;
-            timer_ic_set_polarity(TIM4, TIM_IC4, TIM_IC_RISING);
+        static uint32_t last_rise_pt = 0;
+
+        if (last_rise_pt != 0) {
+            // Handle timer wraparound
+            if (now >= last_rise_pt) {
+                pump_pt_period = now - last_rise_pt;
+            } else {
+                pump_pt_period = (TIMER_PERIOD - last_rise_pt) + now;
+            }
             pump_pt_ready = true;
         }
+        last_rise_pt = now;
         timer_clear_flag(TIM4, TIM_SR_CC4IF);
     }
 }

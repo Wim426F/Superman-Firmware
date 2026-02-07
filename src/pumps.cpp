@@ -21,6 +21,12 @@
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/rcc.h>
 
+// Volatile variables updated by TIM4 ISR in main.cpp
+extern volatile uint32_t pump_batt_period;
+extern volatile bool pump_batt_ready;
+extern volatile uint32_t pump_pt_period;
+extern volatile bool pump_pt_ready;
+
 void Compressor::handle2A8(uint32_t data[2])
 {
     /*
@@ -198,29 +204,18 @@ void Waterpump::powertrainSetDuty(uint8_t duty) // in %
     pwm_write(duty, PWM_PUMP_PT_TIM, PWM_PUMP_PT_OC, PWM_PUMP_PT_ARR);
 }
 
+// TIM4 runs at 500 kHz (72 MHz / (143+1) prescaler), 2µs per tick
+// Period in ticks, convert to RPM: (500,000 / period_ticks) * 60
+// Returns last measured value (updated by ISR at input frequency rate)
+// TODO: Add RPM-to-flow lookup table for centrifugal pump curve
 float Waterpump::batteryGetFlow()
 {
-    float pump_battery_flow = 0;
-
-    // Pump PWM feedback
-    if (timer_get_flag(TIM4, TIM_SR_CC3IF))
-    {
-       pump_battery_flow = timer_get_ic_value(TIM4, TIM_IC3);
-       Param::SetFloat(Param::pump_battery_flow, pump_battery_flow);
-    }
-   
-    return pump_battery_flow;
+    if (pump_batt_period == 0) return 0.0f;
+    return 30000000.0f / pump_batt_period;  // RPM (will be converted to LPM later)
 }
 
 float Waterpump::powertrainGetFlow()
 {
-    float pump_powertrain_flow = 0;
-
-    // Pump PWM feedback
-    if (timer_get_flag(TIM4, TIM_SR_CC4IF))
-    {
-       pump_powertrain_flow = timer_get_ic_value(TIM4, TIM_IC4);
-       Param::SetFloat(Param::pump_powertrain_flow, pump_powertrain_flow);
-    }
-    return pump_powertrain_flow;
+    if (pump_pt_period == 0) return 0.0f;
+    return 30000000.0f / pump_pt_period;  // RPM (will be converted to LPM later)
 }

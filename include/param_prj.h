@@ -85,14 +85,14 @@
    VALUE_ENTRY(temp_radiator,               "°C",      2023 ) \
    VALUE_ENTRY(temp_battery,                "°C",      2024 ) \
    VALUE_ENTRY(temp_powertrain,             "°C",      2025 ) \
-   VALUE_ENTRY(reservoir_level,             "dig",     2026 ) \
+   VALUE_ENTRY(reservoir_level,            FLUID_LEVEL,2026 ) \
    VALUE_ENTRY(cool_cabin,                  ONOFF,     2029 ) \
    VALUE_ENTRY(heat_cabinl,                 ONOFF,     2030 ) \
    VALUE_ENTRY(heat_cabinr,                 ONOFF,     2031 ) \
    VALUE_ENTRY(preheat_req,                 ONOFF,     2032 ) \
-   VALUE_ENTRY(pump_battery_flow,           "lpm",     2033 ) \
+   VALUE_ENTRY(pump_battery_flow,           "rpm",     2033 ) \
    VALUE_ENTRY(pump_battery_duty,           "%",       2034 ) \
-   VALUE_ENTRY(pump_powertrain_flow,        "lpm",     2035 ) \
+   VALUE_ENTRY(pump_powertrain_flow,        "rpm",     2035 ) \
    VALUE_ENTRY(pump_powertrain_duty,        "%",       2036 ) \
    VALUE_ENTRY(compressor_enable,           "dig",     2037 ) \
    VALUE_ENTRY(compressor_speed,            "rpm",     2038 ) \
@@ -120,6 +120,7 @@
 #define THERMAL_DEMANDS    "0=None, 1=CoolCabin, 2=CoolBattery, 4=CoolPowertrain, 8=HeatCabinL, 16=HeatCabinR, 32=HeatBattery, 64=RadiatorDefrost"
 #define NTC                "0=JCurve, 1=KTY81-110, 2=KTY83-110, 3=KTY84-130, 4=Tesla_100K, 5=Tesla_10K, 6=PT1000"
 #define OPEN_CLOSE         "0=Open, 1=Closed"
+#define FLUID_LEVEL        "0=Empty, 1=Normal"
 #define CANIO              "0=HW-IO, 1=CAN-IO"
 #define HWIO_SRC           "0=Ext1, 1=Ext2, 2=Ext3, 3=Ext4"
 #define ONOFF              "0=Off, 1=On, 2=na"

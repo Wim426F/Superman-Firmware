@@ -95,6 +95,13 @@ void write_bootloader_pininit()
    commands.pindef[0].inout = PIN_OUT;
    commands.pindef[0].level = 0;
 
+   // Initialize PB8 and PB9 as inputs with pull-UP during bootloader
+   // to prevent MCT8329A driver faults during startup
+   commands.pindef[1].port = GPIOB;
+   commands.pindef[1].pin = GPIO8 | GPIO9;
+   commands.pindef[1].inout = PIN_IN;
+   commands.pindef[1].level = 1;  // 1 = pull-up, 0 = pull-down
+
 
    crc_reset();
    uint32_t crc = crc_calculate_block(((uint32_t*)&commands), PINDEF_NUMWORDS);
@@ -193,25 +200,31 @@ void tim_setup()
    /*-------------------------------------------------*/
    /*    Input pwm capture for waterpumps feedback    */
    /*-------------------------------------------------*/
+   // Configure PB8 and PB9 as floating inputs for timer input capture
+   gpio_set_mode(GPIOB, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, GPIO8 | GPIO9);
+
    timer_disable_counter(TIM4);
-   timer_set_prescaler(TIM4, 71); //run at 1 MHz
-   timer_set_period(TIM4, 999);  // 1 MHz / 1000 = 1 kHz PWM
+   timer_set_prescaler(TIM4, 143); // 72MHz/144 = 500kHz, 2µs per tick
+   timer_set_period(TIM4, 50000);  // 500kHz / 50000 = 10Hz PWM, allows 12-135Hz input capture
    timer_direction_up(TIM4);
-   timer_slave_set_mode(TIM4, TIM_SMCR_SMS_RM);
-   timer_slave_set_polarity(TIM4, TIM_ET_FALLING);
-   timer_slave_set_trigger(TIM4, TIM_SMCR_TS_TI1FP1);
+   // Slave mode disabled - interferes with CH3/CH4 input capture
+   // timer_slave_set_mode(TIM4, TIM_SMCR_SMS_RM);
+   // timer_slave_set_polarity(TIM4, TIM_ET_FALLING);
+   // timer_slave_set_trigger(TIM4, TIM_SMCR_TS_TI1FP1);
 
    // Waterpump battery
    timer_ic_set_filter(TIM4, TIM_IC3, TIM_IC_DTF_DIV_32_N_8);
    timer_ic_set_input(TIM4, TIM_IC3, TIM_IC_IN_TI3);  // TI3 on PB8
    timer_ic_set_polarity(TIM4, PWMIN_PUMP_BATT_CH, TIM_IC_RISING);
    timer_ic_enable(TIM4, PWMIN_PUMP_BATT_CH);
+   timer_enable_irq(TIM4, TIM_DIER_CC3IE);  // Enable capture interrupt for CH3
 
    // Waterpump powertrain
-   timer_ic_set_filter(TIM4, TIM_IC4, TIM_IC_DTF_DIV_32_N_8);
+   timer_ic_set_filter(TIM4, TIM_IC4, TIM_IC_OFF);  // No filter to reduce input loading
    timer_ic_set_input(TIM4, TIM_IC4, TIM_IC_IN_TI4);  // TI4 on PB9
    timer_ic_set_polarity(TIM4, PWMIN_PUMP_PT_CH, TIM_IC_RISING);
    timer_ic_enable(TIM4, PWMIN_PUMP_PT_CH);
+   timer_enable_irq(TIM4, TIM_DIER_CC4IE);  // Enable capture interrupt for CH4
 
    // Waterpump battery 1 kHz PWM
    gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO6);
