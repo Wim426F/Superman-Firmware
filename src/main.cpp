@@ -62,7 +62,7 @@ static CanSdo* canSdo;
 static Terminal* terminal;
 
 
-volatile int octovalve_position = 0;
+volatile int octovalve_pulse_count = 0;  // Raw encoder pulse counter
 volatile uint32_t pump_batt_period = 0;
 volatile uint32_t pump_pt_period = 0;
 volatile bool pump_batt_ready = false, pump_pt_ready = false;
@@ -96,7 +96,9 @@ static void Ms10Task(void)
    // Set pump RPM feedback (repurposing flow parameters for RPM)
    Param::SetInt(Param::pump_battery_flow, (int)Waterpump::batteryGetFlow());
    Param::SetInt(Param::pump_powertrain_flow, (int)Waterpump::powertrainGetFlow());
-   Param::SetInt(Param::octovalve_position, octovalve_position);
+
+   Valve::octoRunTask();
+   Param::SetInt(Param::octovalve_position, Valve::octoGetPos());
 }
 
 
@@ -204,16 +206,16 @@ extern "C" void tim3_isr(void)
 extern "C" void exti9_5_isr(void) {
     if (exti_get_flag_status(EXTI8)) {
         if (Valve::valve_turning_direction == CLOCKWISE) {
-            octovalve_position++;
+            octovalve_pulse_count++;
         } else {
-            octovalve_position--;
+            octovalve_pulse_count--;
         }
         exti_reset_request(EXTI8);
     }
 }
 
 // Waterpump PWM frequency feedback
-// Measures period between rising edges to calculate frequency and RPM
+// Measures period between rising edges to calculate frequency
 extern "C" void tim4_isr(void) {
     const uint32_t TIMER_PERIOD = 50000;  // TIM4 period
 
@@ -310,6 +312,8 @@ extern "C" int main(void)
 
    delay_ms(10);
    Valve::expansionCalibrateAll();
+   delay_ms(100);  // Wait for expansion valves to start
+   Valve::octoCalibrate();  // Calibrate octovalve to endstop
 
    while(1)
    {

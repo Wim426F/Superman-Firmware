@@ -19,7 +19,11 @@
 
 #include "valves.h"
 #include <libopencm3/cm3/systick.h>
+#include <libopencm3/stm32/rtc.h>
 #include <algorithm>
+
+// External volatile from main.cpp for direct ISR pulse counter access
+extern volatile int octovalve_pulse_count;
 
 
 int expv_pos = 0;
@@ -28,23 +32,29 @@ uint32_t expv_param_id = 0;
 int steps_queue[6] = {0,0,0,0,0,0}; // used for non-blocking step taking
 bool calibration_active = false; // calibration takes a while, so meanwhile must not set other steps 
 
+int octo_target_position = 0;  // Target position (0=none, 1-5=position)
+int octo_current_position = 0;  // Current position (1-5) computed from pulses
 int octo_currentpos = 0;
 int oct0_pulses = 0;
 
-const int TOTAL_PULSES = 1000;  // Verify later, FIXME
-const int BAND_SIZE = TOTAL_PULSES / 5;  // 200
-const int TOLERANCE = 5;
-const int pos_centers[] = {0, 100, 300, 500, 700, 900};  // Index 0 unused; centers for bands
+const int TOTAL_PULSES = 950;  // Measured: 948-1014 depending on direction and mechanical play
+const int BAND_SIZE = TOTAL_PULSES / 4;  // 250 pulses between positions (4 gaps for 5 positions)
+const int TOLERANCE = 10;
+const int pos_centers[] = {0, 0, 240, 450, 670, 950};  // Index 0 unused; POS1=0, POS2=250, POS3=500, POS4=750, POS5=1000
 
 volatile int current_pos = 0;  // From EXTI ISR
 volatile enum OctoPos target_pos = POS1;
 volatile bool in_transit = false;
 volatile uint32_t command_start_ms = 0;  // For stall timeout
-const uint32_t STALL_TIMEOUT_MS = 2000;
+const uint32_t STALL_TIMEOUT_MS = 1000;
 
 
 bool pulse = true;
 bool Valve::valve_turning_direction = true;
+bool Valve::octo_calibrating = false;
+
+static uint32_t last_pulse_time = 0;
+static int last_pulse_count = 0;
 
 DigIo* Valve::pin_dir = nullptr;
 DigIo* Valve::pin_en = nullptr;
@@ -188,30 +198,175 @@ void Valve::coolantCondensorClose()
 }
 
 int Valve::octoSetPos(int set_position)
-{   
-    Param::SetInt(Param::octovalve_setpoint, set_position);
-	octo_currentpos = Param::GetInt(Param::octovalve_position);
+{
+	// Don't allow manual positioning during calibration
+	if (octo_calibrating) return -1;
 
-	if (octo_currentpos != set_position)
+	// Validate position range (0-5, where 0=stop)
+	if (set_position < 0 || set_position > 5) return -1;
+
+	// Set target position (0 = stop motor)
+	octo_target_position = set_position;
+	Param::SetInt(Param::octovalve_setpoint, set_position);
+
+	return 0;
+}
+
+void Valve::octoRunTask()
+{
+	const int POSITION_TOLERANCE = 10;  // Stop within +/- 10 pulses of target
+	const uint32_t STALL_TIMEOUT = 100; // 200ms (assuming 10ms call rate, 20 * 10ms = 200ms)
+
+	// Get current pulse count directly from ISR counter
+	int current_pulses = octovalve_pulse_count;
+
+	// Compute current position (1-5) from pulses
+	int closest_pos = 1;
+	int min_error = abs(current_pulses - pos_centers[1]);
+	for (int pos = 2; pos <= 5; pos++)
 	{
-		if(set_position > octo_currentpos) // Move clockwise
+		int error = abs(current_pulses - pos_centers[pos]);
+		if (error < min_error)
 		{
-            valve_turning_direction = CLOCKWISE;
+			min_error = error;
+			closest_pos = pos;
+		}
+	}
+	octo_current_position = closest_pos;
+
+	// Handle calibration mode
+	if (octo_calibrating)
+	{
+		uint32_t current_time = rtc_get_counter_val();
+
+		// Check if pulses changed
+		if (current_pulses != last_pulse_count)
+		{
+			// Still moving, update tracking
+			last_pulse_count = current_pulses;
+			last_pulse_time = current_time;
+		}
+		else
+		{
+			// No movement detected, check if timeout reached
+			uint32_t time_since_pulse = current_time - last_pulse_time;
+
+			if (time_since_pulse >= STALL_TIMEOUT)
+			{
+				// Stalled against endstop - calibration complete!
+				// Stop motor
+				DigIo::octo_in1.Clear();
+				DigIo::octo_in2.Clear();
+
+				// Set this as position 1 (0 pulses at first endstop)
+				octovalve_pulse_count = 0;
+
+				// Clear calibration flag
+				octo_calibrating = false;
+			}
+		}
+		return;  // Skip normal positioning during calibration
+	}
+
+	// Normal positioning mode
+	// If no target set, ensure motor is stopped
+	if (octo_target_position == 0)
+	{
+		DigIo::octo_in1.Clear();
+		DigIo::octo_in2.Clear();
+		last_pulse_count = current_pulses;  // Reset tracking
+		last_pulse_time = rtc_get_counter_val();
+		return;
+	}
+
+	// Check if we need to move
+	int target_pulses = pos_centers[octo_target_position];
+	int position_error = target_pulses - current_pulses;
+
+	if (abs(position_error) > POSITION_TOLERANCE)
+	{
+		// Not at target, check for stall (drift/endstop detection)
+		uint32_t current_time = rtc_get_counter_val();
+
+		if (current_pulses != last_pulse_count)
+		{
+			// Still moving normally, update tracking
+			last_pulse_count = current_pulses;
+			last_pulse_time = current_time;
+		}
+		else
+		{
+			// No movement detected, check if stalled
+			uint32_t time_since_pulse = current_time - last_pulse_time;
+
+			if (time_since_pulse >= STALL_TIMEOUT)
+			{
+				// Stalled! Hit endstop or obstacle
+				// Stop motor
+				DigIo::octo_in1.Clear();
+				DigIo::octo_in2.Clear();
+
+				// If targeting an endstop position (1 or 5), correct drift
+				if (octo_target_position == 1)
+				{
+					// Hit position 1 endstop, correct to 0 pulses
+					octovalve_pulse_count = pos_centers[0];
+				}
+				else if (octo_target_position == 5)
+				{
+					// Hit position 5 endstop, correct to 1000 pulses
+					octovalve_pulse_count = pos_centers[5];
+				}
+				// For middle positions (2,3,4), accept current position
+
+				// Clear target to stop trying
+				octo_target_position = 0;
+				return;
+			}
+		}
+
+		// Keep moving
+		if(position_error > 0) // Need to move clockwise
+		{
+			valve_turning_direction = CLOCKWISE;
 			DigIo::octo_in1.Set();
 			DigIo::octo_in2.Clear();
 		}
-		if (set_position < octo_currentpos) // Move counterclockwise
+		else // Need to move counterclockwise
 		{
-            valve_turning_direction = COUNTERCLOCKWISE;
+			valve_turning_direction = COUNTERCLOCKWISE;
 			DigIo::octo_in1.Clear();
 			DigIo::octo_in2.Set();
 		}
 	}
-	return 0;
+	else
+	{
+		// Position reached - stop motor
+		DigIo::octo_in1.Clear();
+		DigIo::octo_in2.Clear();
+		last_pulse_count = current_pulses;  // Reset tracking
+		last_pulse_time = rtc_get_counter_val();
+	}
 }
 
 int Valve::octoGetPos()
 {
-
-	return 0;
+	return octo_current_position;
 }
+
+void Valve::octoCalibrate()
+{
+	// Start calibration: move clockwise to position 1 endstop
+	octo_calibrating = true;
+	octo_target_position = 0;  // Clear any target
+	valve_turning_direction = COUNTERCLOCKWISE;
+
+	// Start motor moving clockwise
+	DigIo::octo_in1.Clear();
+	DigIo::octo_in2.Set();
+
+	// Initialize tracking variables
+	last_pulse_time = rtc_get_counter_val();
+	last_pulse_count = octovalve_pulse_count;
+}
+

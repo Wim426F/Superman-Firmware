@@ -33,10 +33,13 @@ public:
     static void coolantCondensorOpen();
     static void coolantCondensorClose();
 
-    static int octoSetPos(int set_position);
-    static int octoGetPos();
+    static int octoSetPos(int set_position);  // Set target position (0=stop, 1-5=position)
+    static int octoGetPos();  // Get current position (1-5)
+    static void octoRunTask();  // Call periodically (handles positioning + calibration)
+    static void octoCalibrate();  // Start calibration sequence
 
     static bool valve_turning_direction;
+    static bool octo_calibrating;
 };
 
 

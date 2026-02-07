@@ -135,7 +135,10 @@ void nvic_setup(void)
    nvic_enable_irq(NVIC_TIM4_IRQ);
    nvic_set_priority(NVIC_TIM4_IRQ, 1);  // Medium prio
 
-   // Octovalve pulse counter
+   // Octovalve pulse counter - Configure EXTI8 for PA8
+   exti_select_source(EXTI8, GPIOA);  // Connect PA8 to EXTI8
+   exti_set_trigger(EXTI8, EXTI_TRIGGER_BOTH);  // Trigger on both edges for debugging
+   exti_enable_request(EXTI8);  // Enable EXTI8 interrupt
    nvic_enable_irq(NVIC_EXTI9_5_IRQ);  // For EXTI8 (5-9 shared)
    nvic_set_priority(NVIC_EXTI9_5_IRQ, 2);  // Medium prio
 }

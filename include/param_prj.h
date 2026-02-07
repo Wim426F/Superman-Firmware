@@ -45,7 +45,7 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 12
+//Next param id (increase when adding new parameter!): 11
 //Next value Id: 2049
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
