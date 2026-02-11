@@ -65,54 +65,54 @@ bool Valve::getPins(int valve)
 {
     switch (valve)
     {
-        case EXPV_EVAPORATOR_RECIRC:
+        case EXPV_EVAPORATOR_COOLANT:
             pin_dir = &DigIo::exp1_dir;
             pin_en = &DigIo::exp1_en;
             pin_step = &DigIo::exp1_step;
-            expv_param_id = Param::expv_recirculation;
-            expv_pos = Param::GetInt(Param::expv_recirculation);
+            expv_param_id = Param::expv_evaporator_coolant;
+            expv_pos = Param::GetInt(Param::expv_evaporator_coolant);
             break;
             
-        case EXPV_CONDENSOR_COOLANT:
+        case EXPV_EVAPORATOR_CABIN:
             pin_dir = &DigIo::exp2_dir;
             pin_en = &DigIo::exp2_en;
             pin_step = &DigIo::exp2_step;
+            expv_param_id = Param::expv_evaporator_cabin;
+            expv_pos = Param::GetInt(Param::expv_evaporator_cabin);
+            break;
+
+        case EXPV_EVAPORATOR_RECIRC:
+            pin_dir = &DigIo::exp3_dir;
+            pin_en = &DigIo::exp3_en;
+            pin_step = &DigIo::exp3_step;
+            expv_param_id = Param::expv_recirculation;
+            expv_pos = Param::GetInt(Param::expv_recirculation);
+            break;
+
+        case EXPV_CONDENSOR_COOLANT:
+            pin_dir = &DigIo::exp4_dir;
+            pin_en = &DigIo::exp4_en;
+            pin_step = &DigIo::exp4_step;
             expv_param_id = Param::expv_condensor_coolant;
             expv_pos = Param::GetInt(Param::expv_condensor_coolant);
             break;
 
-        case EXPV_CONDENSOR_CABINR:
-            pin_dir = &DigIo::exp3_dir;
-            pin_en = &DigIo::exp3_en;
-            pin_step = &DigIo::exp3_step;
-            expv_param_id = Param::expv_condensor_cabinr;
-            expv_pos = Param::GetInt(Param::expv_condensor_cabinr);
-            break;
-
         case EXPV_CONDENSOR_CABINL:
-            pin_dir = &DigIo::exp4_dir;
-            pin_en = &DigIo::exp4_en;
-            pin_step = &DigIo::exp4_step;
+            pin_dir = &DigIo::exp5_dir;
+            pin_en = &DigIo::exp5_en;
+            pin_step = &DigIo::exp5_step;
             expv_param_id = Param::expv_condensor_cabinl;
             expv_pos = Param::GetInt(Param::expv_condensor_cabinl);
             break;
 
-        case EXPV_EVAPORATOR_COOLANT:
-            pin_dir = &DigIo::exp5_dir;
-            pin_en = &DigIo::exp5_en;
-            pin_step = &DigIo::exp5_step;
-            expv_param_id = Param::expv_evaporator_coolant;
-            expv_pos = Param::GetInt(Param::expv_evaporator_coolant);
-            break;
-
-        case EXPV_EVAPORATOR_CABIN:
+        case EXPV_CONDENSOR_CABINR:
             pin_dir = &DigIo::exp6_dir;
             pin_en = &DigIo::exp6_en;
             pin_step = &DigIo::exp6_step;
-            expv_param_id = Param::expv_evaporator_cabin;
-            expv_pos = Param::GetInt(Param::expv_evaporator_cabin);
+            expv_param_id = Param::expv_condensor_cabinr;
+            expv_pos = Param::GetInt(Param::expv_condensor_cabinr);
             break;
-        
+
         default:
             return false;
     }
