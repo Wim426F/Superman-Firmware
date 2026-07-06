@@ -99,6 +99,8 @@ static void Ms10Task(void)
 
    Valve::octoRunTask();
    Param::SetInt(Param::octovalve_position, Valve::octoGetPos());
+
+   UpdateReservoirLevel(); // capacitive coolant reservoir level sensor (PB1)
 }
 
 
@@ -265,6 +267,7 @@ extern "C" int main(void)
    DIG_IO_CONFIGURE(DIG_IO_LIST);
 
    AnaIn::Start(); //Starts background ADC conversion via DMA
+   adc2_setup();   //ADC2 one-shot conversions for the reservoir level sensor (PB1)
 
    write_bootloader_pininit(); //Instructs boot loader to initialize certain pins
 

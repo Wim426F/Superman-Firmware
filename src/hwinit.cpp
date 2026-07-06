@@ -34,6 +34,7 @@
 #include "hwinit.h"
 #include "stm32_loader.h"
 #include "my_string.h"
+#include "delay.h"
 
 /**
 * Start clocks of all needed peripherals
@@ -62,6 +63,7 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_DMA1); // ADC, Encoder and UART receive
 
    rcc_periph_clock_enable(RCC_ADC1);
+   rcc_periph_clock_enable(RCC_ADC2); // Reservoir level capacitive sensor (PB1)
    rcc_periph_clock_enable(RCC_CRC);
    rcc_periph_clock_enable(RCC_AFIO); // CAN
    rcc_periph_clock_enable(RCC_CAN1); // CAN
@@ -247,4 +249,28 @@ void tim_setup()
 
    timer_generate_event(TIM4, TIM_EGR_UG);
    timer_enable_counter(TIM4);
+}
+
+
+/* Set up ADC2 for one-shot, software-triggered conversions of the coolant
+ * reservoir level sensor on PB1 (ADC12_IN9). ADC1 is used by the DMA-scanned
+ * AnaIn framework; ADC2 is otherwise idle, so we use it here to avoid
+ * disturbing the background scan. The reservoir pin is switched between output
+ * (to charge the sensor cap) and analog input (to read) at runtime in
+ * sensors.cpp, so it is deliberately not part of ANA_IN_LIST. */
+void adc2_setup(void)
+{
+   uint8_t channel = 9; // PB1 = ADC12_IN9
+
+   adc_power_off(ADC2);
+   adc_disable_scan_mode(ADC2);
+   adc_set_single_conversion_mode(ADC2);
+   // 10k source impedance -> use a long sample time for a settled reading
+   adc_set_sample_time_on_all_channels(ADC2, ADC_SMPR_SMP_239DOT5CYC);
+   adc_set_regular_sequence(ADC2, 1, &channel);
+   adc_enable_external_trigger_regular(ADC2, ADC_CR2_EXTSEL_SWSTART);
+   adc_power_on(ADC2);
+   uDelay(10);                 // tSTAB before calibration
+   adc_reset_calibration(ADC2);
+   adc_calibrate(ADC2);
 }

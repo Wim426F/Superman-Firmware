@@ -8,6 +8,7 @@
 #include "temp_meas.h"
 
 void GetSensorReadings();
+void UpdateReservoirLevel();
 
 
 #endif // SENSORS_H

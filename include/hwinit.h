@@ -30,6 +30,7 @@ void clock_setup(void);
 void nvic_setup(void);
 void rtc_setup(void);
 void tim_setup(void);
+void adc2_setup(void); // ADC2 one-shot for reservoir level sensor (PB1)
 void exti_setup(void);
 void spi1_setup();   //spi 1 used for External ADC
 void usart3_setup(void); // for LIN comms

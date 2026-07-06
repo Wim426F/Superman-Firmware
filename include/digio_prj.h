@@ -11,7 +11,6 @@
 #define DIG_IO_LIST \
     DIG_IO_ENTRY(octo_pulse,            GPIOA, GPIO8,  PinMode::INPUT_FLT)   \
     DIG_IO_ENTRY(exp3_dir,              GPIOA, GPIO15, PinMode::OUTPUT)      \
-    DIG_IO_ENTRY(reservoir_level,       GPIOB, GPIO1,  PinMode::INPUT_PU)    \
     DIG_IO_ENTRY(preheat_req,           GPIOB, GPIO2,  PinMode::INPUT_PD)    \
     DIG_IO_ENTRY(exp2_dir,              GPIOB, GPIO3,  PinMode::OUTPUT)      \
     DIG_IO_ENTRY(exp2_step,             GPIOB, GPIO4,  PinMode::OUTPUT)      \

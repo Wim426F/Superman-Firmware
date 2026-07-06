@@ -38,7 +38,7 @@
  * IDs are 16 bit, so 65535 is the maximum
  */
 
-#define VERSION 0.5.superman
+#define VERSION 0.6.superman
 
 /* Entries must be ordered as follows:
    1. Saveable parameters (id != 0)
@@ -46,7 +46,7 @@
    3. Display values
  */
 //Next param id (increase when adding new parameter!): 11
-//Next value Id: 2049
+//Next value Id: 2050
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
    PARAM_ENTRY(CAT_COMM,    canspeed,              CANSPEEDS,    0,      4,       2,       0  ) \
@@ -85,7 +85,8 @@
    VALUE_ENTRY(temp_radiator,               "°C",      2023 ) \
    VALUE_ENTRY(temp_battery,                "°C",      2024 ) \
    VALUE_ENTRY(temp_powertrain,             "°C",      2025 ) \
-   VALUE_ENTRY(reservoir_level,            FLUID_LEVEL,2026 ) \
+   VALUE_ENTRY(reservoir_level,            COOLANT_LEVEL,2026 ) \
+   VALUE_ENTRY(reservoir_cap,               "uF",      2049 ) \
    VALUE_ENTRY(cool_cabin,                  ONOFF,     2029 ) \
    VALUE_ENTRY(heat_cabinl,                 ONOFF,     2030 ) \
    VALUE_ENTRY(heat_cabinr,                 ONOFF,     2031 ) \
@@ -120,7 +121,7 @@
 #define THERMAL_DEMANDS    "0=None, 1=CoolCabin, 2=CoolBattery, 4=CoolPowertrain, 8=HeatCabinL, 16=HeatCabinR, 32=HeatBattery, 64=RadiatorDefrost"
 #define NTC                "0=JCurve, 1=KTY81-110, 2=KTY83-110, 3=KTY84-130, 4=Tesla_100K, 5=Tesla_10K, 6=PT1000"
 #define OPEN_CLOSE         "0=Open, 1=Closed"
-#define FLUID_LEVEL        "0=Empty, 1=Normal"
+#define COOLANT_LEVEL      "0=Empty, 1=Minimum, 2=Nominal, 3=Max"
 #define CANIO              "0=HW-IO, 1=CAN-IO"
 #define HWIO_SRC           "0=Ext1, 1=Ext2, 2=Ext3, 3=Ext4"
 #define ONOFF              "0=Off, 1=On, 2=na"
@@ -195,6 +196,13 @@ enum _ThermalDemands
    RADIATOR_DEFROST = 64
 };
 
+enum CoolantLevel
+{
+   COOLANT_EMPTY = 0,
+   COOLANT_MINIMUM = 1,
+   COOLANT_NOMINAL = 2,
+   COOLANT_MAX = 3
+};
 
 //Generated enum-string for possible errors
 extern const char* errorListString;

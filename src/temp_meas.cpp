@@ -54,6 +54,9 @@ static const uint16_t Tesla10k[] = { TESLA_10K };
 /* Temp sensor PT1000 */
 static const uint16_t Pt1000[] = { PT1000 };
 
+/* Inline coolant temp sensor GE1935 */
+static const uint16_t Ge1935[] = { GE1935 };
+
 
 static const TEMP_SENSOR sensors[] =
 {
@@ -62,7 +65,8 @@ static const TEMP_SENSOR sensors[] =
    { -50, 170, 10, TABLEN(Kty83),          PTC, Kty83   },
    { -10, 150, 2,  TABLEN(NPT_50k),        PTC, NPT_50k }, // actually ntc but whatever
    { -30, 110, 2,  TABLEN(Tesla10k),       PTC, Tesla10k}, // actually ntc but whatever
-   { -50, 150, 10, TABLEN(Pt1000),         PTC, Pt1000  }
+   { -50, 150, 10, TABLEN(Pt1000),         PTC, Pt1000  },
+   { -40, 120, 5,  TABLEN(Ge1935),         PTC, Ge1935  }  // actually ntc but whatever
 };
 
 float TempMeas::Lookup(int digit, Sensors sensorId)

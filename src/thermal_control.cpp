@@ -276,11 +276,11 @@ void thermalControl() {
     // Dynamic setpoint for condensor/evaporator to 
     float ambient = Param::GetInt(Param::temp_ambient);
     int32_t ambient_low = RECIRC_TEMP_THRESHOLD;  // e.g., -20
-    int32_t ambient_high = 10; // e.g., 10
-    int32_t condensor_min = 50;          // e.g., 50
-    int32_t condensor_max = 70;          // e.g., 70
+    int32_t ambient_high = 10;
+    int32_t condensor_min = 40;
+    int32_t condensor_max = 60;
 
-    // below -20C ambient the condensor setpoint is 50, above 10C the setpoint is 70CC. between ambient -20C and 10C linear interpolation
+    // below -20C ambient the condensor setpoint is 40, above 10C the setpoint is 60C. between ambient -20C and 10C linear interpolation
     // this is an attempt to improve COP in some conditions
     int32_t condensor_set_int = utils::change(ambient, ambient_low, ambient_high, condensor_min, condensor_max);
     int32_t condensor_setpoint = std::max(condensor_min, std::min(condensor_max, condensor_set_int)); // Clamp
@@ -299,8 +299,8 @@ void thermalControl() {
     SinkType bestSink = selectBestSink(evap_setpoint, sinks);
 
     
-    // Tie waterpump speeds to compressor with minimum and maximum of 30-80% waterpump duty.
-    int pumpDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 30, 80);
+    // Tie waterpump speeds to compressor with minimum and maximum of 20-80% waterpump duty.
+    int pumpDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 20, 80);
     Waterpump::powertrainSetDuty(static_cast<uint8_t>(pumpDuty));
     Waterpump::batterySetDuty(static_cast<uint8_t>(pumpDuty));
     
@@ -343,7 +343,7 @@ void thermalControl() {
         Valve::octoSetPos(OctoPos::POS5_PARALLEL); // {Condensor -> Radiator -> Powertrain}  +  {Evaporator -> Battery}
         // Powertrain passive cooling only. Condensor CAN reject heat from cabin and evaporator CAN cool battery
         // i.e. this mode is only for cabin and/or battery active cooling, no powertrain active cooling
-    
+
 
     // Dominant heating mode
     if (demands.cabinLHeating || demands.cabinRHeating || (demands.batteryHeating && !demands.cabinCooling))
