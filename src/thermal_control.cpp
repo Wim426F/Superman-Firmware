@@ -300,7 +300,9 @@ void thermalControl() {
 
     
     // Tie waterpump speeds to compressor with minimum and maximum of 20-80% waterpump duty.
-    int pumpDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 20, 80);
+    bool reservoirFull = Param::GetInt(Param::reservoir_level) != 0;
+    int requestedDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 20, 80);
+    int pumpDuty = reservoirFull ? requestedDuty : 0; // If reservoir is empty, refuse to run pumps.
     Waterpump::powertrainSetDuty(static_cast<uint8_t>(pumpDuty));
     Waterpump::batterySetDuty(static_cast<uint8_t>(pumpDuty));
     
