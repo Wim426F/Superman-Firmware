@@ -69,7 +69,7 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_CAN1); // CAN
 
    // Remap
-   AFIO_MAPR |= AFIO_MAPR_TIM1_REMAP_FULL_REMAP;     // CH2=PE11 for solenoid
+   // AFIO_MAPR |= AFIO_MAPR_TIM1_REMAP_FULL_REMAP;     // CH2=PE11 for solenoid -- disabled: PE11 used as valve_lcc GPIO
    AFIO_MAPR |= AFIO_MAPR_TIM2_REMAP_PARTIAL_REMAP2; // CH4=PB11 for fan
    
 }
@@ -167,21 +167,24 @@ void tim_setup()
 
 
    // TIM1 setup for 20 kHz solenoid_gate (CH2 PE11)
-   timer_disable_counter(TIM1);
-   timer_set_prescaler(TIM1, 0);
-   timer_set_alignment(TIM1, TIM_CR1_CMS_EDGE);
-   timer_set_period(TIM1, 3599);  // 72 MHz / 3600 = 20 kHz
-   timer_enable_preload(TIM1);
+   // -- disabled for now: PE11 is used as the valve_lcc GPIO output. Re-enable this
+   //    (and the TIM1 remap above) only if the solenoid moves to a different pin,
+   //    otherwise it reclaims PE11 as alt-function and valve_lcc stops switching.
+   // timer_disable_counter(TIM1);
+   // timer_set_prescaler(TIM1, 0);
+   // timer_set_alignment(TIM1, TIM_CR1_CMS_EDGE);
+   // timer_set_period(TIM1, 3599);  // 72 MHz / 3600 = 20 kHz
+   // timer_enable_preload(TIM1);
 
-   gpio_set_mode(GPIOE, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO11);  // PE11=CH2
+   // gpio_set_mode(GPIOE, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO11);  // PE11=CH2
 
-   timer_set_oc_mode(TIM1, TIM_OC2, TIM_OCM_PWM1);
-   timer_enable_oc_preload(TIM1, TIM_OC2);
-   timer_set_oc_polarity_high(TIM1, TIM_OC2);
-   timer_enable_oc_output(TIM1, TIM_OC2);
-   timer_set_oc_value(TIM1, TIM_OC2, 0);  // 0% init
+   // timer_set_oc_mode(TIM1, TIM_OC2, TIM_OCM_PWM1);
+   // timer_enable_oc_preload(TIM1, TIM_OC2);
+   // timer_set_oc_polarity_high(TIM1, TIM_OC2);
+   // timer_enable_oc_output(TIM1, TIM_OC2);
+   // timer_set_oc_value(TIM1, TIM_OC2, 0);  // 0% init
 
-   timer_enable_counter(TIM1);
+   // timer_enable_counter(TIM1);
 
    // Timer 2 (PWM outputs, 100 Hz)
    timer_disable_counter(TIM2);
