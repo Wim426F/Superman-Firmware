@@ -45,7 +45,7 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 11
+//Next param id (increase when adding new parameter!): 24
 //Next value Id: 2050
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
@@ -60,6 +60,20 @@
    PARAM_ENTRY(CAT_CTRL,    temp_evaporator_setp,  "°C",        -30,     100,     5,       8  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_condensor_setp,   "°C",        -30,     100,     70,      9  ) \
    PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      10000,   6000,    10 ) \
+   /* --- Hardware bring-up test mode (hardware-test build only). Defaults are safe (all off/closed). --- */ \
+   PARAM_ENTRY(CAT_TEST,    test_expv_evap_coolant,"dig",        0,      255,     0,       11 ) \
+   PARAM_ENTRY(CAT_TEST,    test_expv_evap_cabin,  "dig",        0,      255,     0,       12 ) \
+   PARAM_ENTRY(CAT_TEST,    test_expv_evap_recirc, "dig",        0,      255,     0,       13 ) \
+   PARAM_ENTRY(CAT_TEST,    test_expv_cond_coolant,"dig",        0,      255,     0,       14 ) \
+   PARAM_ENTRY(CAT_TEST,    test_expv_cond_cabinl, "dig",        0,      255,     0,       15 ) \
+   PARAM_ENTRY(CAT_TEST,    test_expv_cond_cabinr, "dig",        0,      255,     0,       16 ) \
+   PARAM_ENTRY(CAT_TEST,    test_valve_condensor,  OPEN_CLOSE,   0,      1,       0,       23 ) \
+   PARAM_ENTRY(CAT_TEST,    test_pump_battery,     "%",          0,      100,     0,       17 ) \
+   PARAM_ENTRY(CAT_TEST,    test_pump_powertrain,  "%",          0,      100,     0,       18 ) \
+   PARAM_ENTRY(CAT_TEST,    test_octo_pos,         OCTOPOS,      0,      5,       0,       19 ) \
+   PARAM_ENTRY(CAT_TEST,    test_compressor_duty,  "%",          0,      100,     0,       20 ) \
+   PARAM_ENTRY(CAT_TEST,    test_calibrate_expv,   ONOFF,        0,      1,       0,       21 ) \
+   PARAM_ENTRY(CAT_TEST,    test_calibrate_octo,   ONOFF,        0,      1,       0,       22 ) \
    VALUE_ENTRY(octovalve_position,          OCTOPOS,   2005 ) \
    VALUE_ENTRY(octovalve_setpoint,          OCTOPOS,   2044 ) \
    VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2046 ) \

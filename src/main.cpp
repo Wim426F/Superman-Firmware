@@ -48,6 +48,7 @@
 #include "sensors.h"
 #include "pumps.h"
 #include "thermal_control.h"
+#include "test_control.h"   // hardware bench test
 
 
 #define CAN_TIMEOUT 50  //500ms
@@ -123,7 +124,9 @@ static void Ms100Task(void)
 
    GetSensorReadings();
 
-   thermalControl(); // The whole thermal management happens in here
+   // HARDWARE-TEST BUILD:  
+   testControl();
+   //thermalControl(); // The whole thermal management happens in here
 
    //If we chose to send CAN messages every 100 ms, do this here.
    canMap->SendAll();
@@ -188,6 +191,22 @@ void Param::Change(Param::PARAM_NUM paramNum)
 
    case Param::nodeid:
       canSdo->SetNodeId(Param::GetInt(Param::nodeid)); //Set node ID for SDO access
+      break;
+
+   case Param::test_calibrate_expv:
+      if (Param::GetInt(Param::test_calibrate_expv))
+      {
+         Valve::expansionCalibrateAll();
+         Param::SetInt(Param::test_calibrate_expv, 0); // momentary set
+      }
+      break;
+
+   case Param::test_calibrate_octo:
+      if (Param::GetInt(Param::test_calibrate_octo))
+      {
+         Valve::octoCalibrate();
+         Param::SetInt(Param::test_calibrate_octo, 0); // momentary set
+      }
       break;
 
    default:
