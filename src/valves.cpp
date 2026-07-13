@@ -121,7 +121,7 @@ bool Valve::getPins(int valve)
 
 void Valve::expansionRunSteps() // check all valves if any steps are queued
 {
-    for (int valve = 0; valve < 5; valve++)
+    for (int valve = 0; valve < 6; valve++)
     {
         if(!getPins(valve+1)) return;
 
@@ -172,7 +172,7 @@ void Valve::expansionCalibrateAll()
 {
     calibration_active = true; // All setpoints given to expvalve_setpos() are ignored during calibration
 
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 6; i++)
     {
         if(!getPins(i+1)) return;
 		steps_queue[i] = 0; // Clear any existing queue just in case
