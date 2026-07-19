@@ -11,10 +11,11 @@
 class Compressor
 {
 public:
-    static void handle2A8(uint32_t data[2]);
     static void handle227(uint32_t data[2]);
-    static void SendMessages(CanHardware* can);
-    static void SetDuty(int duty); // percentage   
+    static void HandleEmuRx(uint32_t id); // collision arbitration: RX on an emulated VCFRONT id means another node owns it
+    static void SendMessages(CanHardware* can); // 100ms: 0x281 (always), 0x2D1, 0x3A1, 0x321 (every 10th call)
+    static void Send50ms(CanHardware* can);     // 50ms: 0x221, 0x545
+    static void SetDuty(int duty); // percentage
     static int GetDuty(); // percentage
 };
 

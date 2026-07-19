@@ -193,11 +193,11 @@ void GetSensorReadings()
     Param::SetFloat(Param::temp_outlet_compressor,  ps2t_filter.filter(TempMeas::Lookup(AnaIn::temp_outlet_compressor.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_ps2_offset);
     Param::SetFloat(Param::temp_pre_evaporator,     ps3t_filter.filter(TempMeas::Lookup(AnaIn::temp_pre_evaporator.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_ps3_offset);
 
-    Param::SetFloat(Param::temp_inlet_battery,      battin_filter.filter( TempMeas::Lookup(AnaIn::temp_inlet_battery.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_battin_offset);
-    Param::SetFloat(Param::temp_inlet_powertrain,   ptinfilter.filter   ( TempMeas::Lookup(AnaIn::temp_inlet_powertrain.Get()  , TempMeas::TEMP_TESLA_10K) ) - temp_ptin_offset);
+    Param::SetFloat(Param::temp_inlet_battery,      battin_filter.filter( TempMeas::Lookup(AnaIn::temp_inlet_battery.Get(), TempMeas::TEMP_GE1935) ) - temp_battin_offset);
+    Param::SetFloat(Param::temp_inlet_powertrain,   ptinfilter.filter   ( TempMeas::Lookup(AnaIn::temp_inlet_powertrain.Get()  , TempMeas::TEMP_GE1935) ) - temp_ptin_offset);
     
-    Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(TempMeas::Lookup(AnaIn::temp_radiator.Get(), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_ambient,        ambient_filter.filter(TempMeas::Lookup(AnaIn::temp_ambient.Get(), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_battery,        battery_filter.filter(TempMeas::Lookup(AnaIn::temp_battery.Get(), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_powertrain,     powertrain_filter.filter(TempMeas::Lookup(AnaIn::temp_powertrain.Get(), TempMeas::TEMP_TESLA_10K)));
+    Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(TempMeas::Lookup(AnaIn::temp_radiator.Get(), TempMeas::TEMP_GE1935)));
+    Param::SetFloat(Param::temp_ambient,        ambient_filter.filter(TempMeas::Lookup(AnaIn::temp_ambient.Get(), TempMeas::TEMP_GE1935)));
+    Param::SetFloat(Param::temp_battery,        battery_filter.filter(TempMeas::Lookup(AnaIn::temp_battery.Get(), TempMeas::TEMP_GE1935)));
+    Param::SetFloat(Param::temp_powertrain,     powertrain_filter.filter(TempMeas::Lookup(AnaIn::temp_powertrain.Get(), TempMeas::TEMP_GE1935)));
 }

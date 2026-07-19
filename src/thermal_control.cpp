@@ -298,7 +298,7 @@ void thermalControl() {
     SourceType bestSource = selectBestSource(condensor_setpoint, sources);
     SinkType bestSink = selectBestSink(evap_setpoint, sinks);
 
-    
+    /* Water pump control */
     // Tie waterpump speeds to compressor with minimum and maximum of 20-80% waterpump duty.
     bool reservoirFull = Param::GetInt(Param::reservoir_level) != 0;
     int requestedDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 20, 80);
@@ -307,7 +307,13 @@ void thermalControl() {
     Waterpump::batterySetDuty(static_cast<uint8_t>(pumpDuty));
     
 
-    /* TODO here, radiatorfan control */
+    /* Radiatorfan control */
+    // only spin radiator if heat must be rejected or absorbed from ambient
+    if (bestSink == SinkType::AMBIENT || bestSource == SourceType::AMBIENT)
+        // tie fan speed to pump speed as simple proxy for heat flow rate.
+        pwm_write(static_cast<uint8_t>(pumpDuty), PWM_FAN_TIM, PWM_FAN_OC, PWM_FAN_ARR); 
+    else
+        pwm_write(0, PWM_FAN_TIM, PWM_FAN_OC, PWM_FAN_ARR); // Fan off
     
 
     // SourceType:  AMBIENT, BATTERY, RECIRCULATION

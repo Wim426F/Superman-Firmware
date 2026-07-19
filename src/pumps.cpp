@@ -20,6 +20,7 @@
 #include "pumps.h"
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/rcc.h>
+#include <libopencm3/stm32/rtc.h>
 
 // Volatile variables updated by TIM4 ISR in main.cpp
 extern volatile uint32_t pump_batt_period;
@@ -27,53 +28,23 @@ extern volatile bool pump_batt_ready;
 extern volatile uint32_t pump_pt_period;
 extern volatile bool pump_pt_ready;
 
-void Compressor::handle2A8(uint32_t data[2])
+
+/* Tesla checksum: sum of bytes 0..6 plus both CAN ID bytes, truncated to 8 bits.
+ * Verified against logged 0x221/0x3A1/0x545 frames from a real Model 3. */
+static uint8_t CalcTeslaChecksum(const uint8_t* bytes, uint16_t id)
 {
-    /*
-    0x2A8 - Compressor Status (CMPD_state)
+    uint16_t sum = (id & 0xFF) + (id >> 8);
+    for (int i = 0; i < 7; i++) sum += bytes[i];
+    return sum & 0xFF;
+}
 
-    Bytes 0-1: Compressor speed in RPM (bits 0-10), scale 10 RPM/bit
-    Bytes 1-2: Speed duty cycle (bits 11-20), scale 0.1%/bit
-    Bytes 2-4: Input HV power (bits 21-31), scale 10W/bit
-    Bytes 4-5: Input HV current (bits 32-40), scale 0.1A/bit
-    Bytes 5-6: Input HV voltage (bits 41-51), scale 0.5V/bit
-    Byte 7: Various state flags (bits 55-63)
-    */
-
-    uint8_t* bytes = (uint8_t*)data; // Convert the two 32-bit words into bytes
-
-    // Extract RPM
-    uint16_t rpm_raw = (bytes[0] | ((bytes[1] & 0x07) << 8)); // 11 bits
-    Param::SetInt(Param::compressor_speed, rpm_raw * 10);
-
-    // Extract Duty Cycle
-    uint16_t duty_raw = ((bytes[1] >> 3) | (bytes[2] << 5)) & 0x3FF; // 10 bits
-    Param::SetFloat(Param::compressor_duty, duty_raw * 0.1);
-
-    // Extract Input HV Power
-    uint16_t power_raw = ((bytes[2] >> 6) | (bytes[3] << 2) | ((bytes[4] & 0x01) << 10)); // 11 bits
-    Param::SetInt(Param::compressor_power, power_raw * 10);
-
-    // Extract Input HV Current
-    uint16_t current_raw = ((bytes[4] >> 1) | ((bytes[5] & 0x01) << 7)); // 9 bits
-    //Param::SetFloat(Param::compressor_amps, current_raw * 0.1);
-
-    // Extract Input HV Voltage
-    uint16_t voltage_raw = ((bytes[5] >> 1) | (bytes[6] << 7)) & 0x7FF; // 11 bits
-    //Param::SetFloat(Param::compressor_HV, voltage_raw * 0.5);
-
-    // Extract States
-    bool powerLimitActive = bytes[6] & 0x80;
-    bool powerLimitTooLowToStart = bytes[7] & 0x40;
-    bool ready = bytes[7] & 0x80;
-    uint8_t state = (bytes[7] >> 0) & 0x0F;
-    uint8_t wasteHeatState = (bytes[7] >> 4) & 0x03;
-
-//  Param::SetInt(Param::compressor_powerLimitActive, powerLimitActive);
-//  Param::SetInt(Param::compressor_powerLimitTooLowToStart, powerLimitTooLowToStart);
-//  Param::SetInt(Param::compressor_ready, ready);
-//  Param::SetInt(Param::compressor_state, state);
-//  Param::SetInt(Param::compressor_wasteHeatState, wasteHeatState);
+/* VCFRONT_CMPPowerLimit must never be sent as 0W - the real car holds it at
+ * 8191W permanently, and the compressor apparently refuses to start if it
+ * reads 0. Fall back to that value if the param is unset/0. */
+static int GetEffectivePowerLimit()
+{
+    int plim = Param::GetInt(Param::compressor_plim);
+    return (plim > 0) ? plim : 8191;
 }
 
 
@@ -85,24 +56,28 @@ void Compressor::handle227(uint32_t data[2])
     Byte 0-1: CMP_speedRPM (RPM)
     Byte 2-3: CMP_speedDuty (in 0.1% increments)
     Byte 4:   CMP_inverterTemperature (Celsius, offset by -40)
-    Byte 5:   Status Flags (each bit represents a different fault or status)
-    Byte 6:   CMP_state (4 bits), other 4 bits reserved
-    Byte 7:   CMP_ready (bit 7)
+    Byte 5:   Status Flags (bits 40-47)
+    Byte 6:   Additional Fault Flags
+    Byte 7:   CMP_state (bits 0-3), CMP_ready (bit 7)
 
-    Fault/Status Flags (Byte 5):
+    Fault/Status Flags (Byte 5, bits 40-47):
     Bit 0: CMP_HVOverVoltage
     Bit 1: CMP_HVUnderVoltage
     Bit 2: CMP_overTemperature
     Bit 3: CMP_underTemperature
     Bit 4: CMP_VCFRONTCANTimeout
     Bit 5: CMP_overCurrent
-    Bit 6: CMP_motorVoltageSat
-    Bit 7: CMP_currentSensorCal
+    Bit 6: CMP_currentSensorCal
+    Bit 7: CMP_failedStart
 
     Byte 6 Additional Faults:
-    Bit 0: CMP_failedStart
+    Bit 0: CMP_motorVoltageSat
     Bit 1: CMP_shortCircuit
     Bit 2: CMP_repeatOverCurrent
+
+    Byte 7:
+    Bits 0-3: CMP_state (0=NONE 1=NORMAL 2=WAIT 3=FAULT 4=SOFT_START 5=SOFT_SHUTDOWN 15=SNA)
+    Bit 7:    CMP_ready
     */
 
     uint8_t* bytes = (uint8_t*)data; // Convert to byte array
@@ -119,28 +94,176 @@ void Compressor::handle227(uint32_t data[2])
     int inverter_temp = bytes[4] - 40;
     Param::SetInt(Param::compressor_temp, inverter_temp);
 
-    // Fault Flags from Byte 5
+    // Fault Flags from Byte 5 (uncomment as params are added)
 //  Param::SetInt(Param::compressor_HVOverVoltage, bytes[5] & 0x01);
 //  Param::SetInt(Param::compressor_HVUnderVoltage, bytes[5] & 0x02);
 //  Param::SetInt(Param::compressor_overTemperature, bytes[5] & 0x04);
 //  Param::SetInt(Param::compressor_underTemperature, bytes[5] & 0x08);
-//  Param::SetInt(Param::compressor_CANTimeout, bytes[5] & 0x10);
+    Param::SetInt(Param::compressor_CANTimeout, (bytes[5] & 0x10) ? 1 : 0);
 //  Param::SetInt(Param::compressor_overCurrent, bytes[5] & 0x20);
-//  Param::SetInt(Param::compressor_motorVoltageSat, bytes[5] & 0x40);
-//  Param::SetInt(Param::compressor_currentSensorCal, bytes[5] & 0x80);
+//  Param::SetInt(Param::compressor_currentSensorCal, bytes[5] & 0x40);
+//  Param::SetInt(Param::compressor_failedStart, bytes[5] & 0x80);
 
     // Additional Fault Flags from Byte 6
-//  Param::SetInt(Param::compressor_failedStart, bytes[6] & 0x01);
+//  Param::SetInt(Param::compressor_motorVoltageSat, bytes[6] & 0x01);
 //  Param::SetInt(Param::compressor_shortCircuit, bytes[6] & 0x02);
 //  Param::SetInt(Param::compressor_repeatOverCurrent, bytes[6] & 0x04);
 
-    // Compressor State
-    int cmp_state = bytes[6] >> 4; // Upper 4 bits
-//    Param::SetInt(Param::compressor_state, cmp_state);
+    // Compressor state and ready flag (byte 7)
+    int cmp_state = bytes[7] & 0x0F;
+    bool cmp_ready = (bytes[7] & 0x80) != 0;
+    Param::SetInt(Param::compressor_state, cmp_state);
+    Param::SetInt(Param::compressor_ready, cmp_ready ? 1 : 0);
 
-    // Compressor Ready Flag
-    bool cmp_ready = bytes[7] & 0x80; // Bit 7
-//  Param::SetBool(Param::compressor_ready, cmp_ready);
+    // Rough HV power estimate: this compressor variant doesn't report power on CAN.
+    // power ~= measured duty% x configured power limit.
+    Param::SetInt(Param::compressor_power, (int)(duty * GetEffectivePowerLimit() / 100.0f));
+}
+
+
+/* ---------------------------------------------------------------------
+ * VCFRONT emulation & collision arbitration
+ *
+ * Other open-source controllers on the same bus (e.g. a PCS charger
+ * controller) may emulate some of the same VCFRONT ids. Since bxCAN never
+ * receives its own transmissions, any RX on one of these ids proves another
+ * node owns it - so we stay quiet on that id until it goes silent again.
+ * --------------------------------------------------------------------- */
+
+enum EmuMsgIdx { EMU_221 = 0, EMU_2D1, EMU_321, EMU_3A1, EMU_545, EMU_COUNT };
+static const uint16_t emuIds[EMU_COUNT] = { 0x221, 0x2D1, 0x321, 0x3A1, 0x545 };
+static uint32_t emuLastHeard[EMU_COUNT] = { 0, 0, 0, 0, 0 };
+static uint8_t emuActiveMask = 0;
+
+#define EMU_BOOT_LISTEN_TICKS      150 // 1500ms, RTC counts at 10ms/tick (see rtc_setup())
+#define EMU_SILENCE_TIMEOUT_TICKS   50 // 500ms
+
+static bool MayTransmit(int idx)
+{
+    int canemu = Param::GetInt(Param::canemu);
+    if (canemu == 1) return true;  // always transmit
+    if (canemu == 2) return false; // never transmit
+
+    // auto: stay quiet during the boot listen window, then take over unless
+    // we've heard the other node inside the silence timeout.
+    uint32_t now = rtc_get_counter_val();
+    if (now < EMU_BOOT_LISTEN_TICKS) return false;
+
+    uint32_t lastHeard = emuLastHeard[idx];
+    return (lastHeard == 0) || ((now - lastHeard) > EMU_SILENCE_TIMEOUT_TICKS);
+}
+
+static void SetActiveBit(int idx, bool active)
+{
+    if (active) emuActiveMask |= (1 << idx);
+    else        emuActiveMask &= ~(1 << idx);
+    Param::SetInt(Param::emu_active, emuActiveMask);
+}
+
+void Compressor::HandleEmuRx(uint32_t id)
+{
+    for (int i = 0; i < EMU_COUNT; i++)
+    {
+        if (emuIds[i] == id)
+        {
+            emuLastHeard[i] = rtc_get_counter_val();
+            break;
+        }
+    }
+}
+
+// VCFRONT_LVPowerState - alternating mux, single shared counter incremented every frame
+static void SendMsg221(CanHardware* can)
+{
+    static uint8_t mux = 0;
+    static uint8_t count = 0;
+
+    uint8_t bytes[8] = {0};
+    if (!mux) {           // mux 1: CMPDLVState = LV_ON, pcsLVState = LV_ON
+        bytes[0]=0x41; bytes[1]=0x01; bytes[2]=0x05; bytes[3]=0x00;
+        bytes[4]=0x00; bytes[5]=0x00;
+        bytes[6]=(count << 4) | 0x0;
+    } else {                 // mux 0: hvacCompLVState = LV_ON
+        bytes[0]=0x40; bytes[1]=0x41; bytes[2]=0x05; bytes[3]=0x15;
+        bytes[4]=0x00; bytes[5]=0x50;
+        bytes[6]=(count << 4) | 0x1;
+    }
+    bytes[7] = CalcTeslaChecksum(bytes, 0x221);
+
+    bool active = MayTransmit(EMU_221);
+    if (active) can->Send(0x221, (uint32_t*)bytes, 8);
+    SetActiveBit(EMU_221, active);
+
+    mux = !mux;
+    count = (count + 1) & 0x0F;
+}
+
+// VCFRONT_okToUseHighPower - static, no counter/checksum
+static void SendMsg2D1(CanHardware* can)
+{
+    bool active = MayTransmit(EMU_2D1);
+    if (active)
+    {
+        uint8_t bytes[8] = {0xFF, 0x01, 0, 0, 0, 0, 0, 0};
+        can->Send(0x2D1, (uint32_t*)bytes, 2);
+    }
+    SetActiveBit(EMU_2D1, active);
+}
+
+// VCFRONT_sensors - static, no counter/checksum
+static void SendMsg321(CanHardware* can)
+{
+    bool active = MayTransmit(EMU_321);
+    if (active)
+    {
+        uint8_t bytes[8] = {0xCB, 0x25, 0xA7, 0x65, 0x02, 0x5F, 0x00, 0x00};
+        can->Send(0x321, (uint32_t*)bytes, 8);
+    }
+    SetActiveBit(EMU_321, active);
+}
+
+// VCFRONT_vehicleStatus - static body, counter + checksum
+static void SendMsg3A1(CanHardware* can)
+{
+    static uint8_t count = 0;
+
+    uint8_t bytes[8];
+    bytes[0]=0x89; bytes[1]=0x42; bytes[2]=0x72; bytes[3]=0x85;
+    bytes[4]=0x01; bytes[5]=0x2C;
+    bytes[6]=(count << 4) | 0x2;
+    bytes[7]=CalcTeslaChecksum(bytes, 0x3A1);
+
+    bool active = MayTransmit(EMU_3A1);
+    if (active) can->Send(0x3A1, (uint32_t*)bytes, 8);
+    SetActiveBit(EMU_3A1, active);
+
+    count = (count + 1) & 0x0F;
+}
+
+// VCFRONT 10Hz mux - alternating mux, single shared counter incremented every frame
+static void SendMsg545(CanHardware* can)
+{
+    static uint8_t mux = 0;
+    static uint8_t count = 0;
+
+    uint8_t bytes[8];
+    if (!mux) {
+        bytes[0]=0x03; bytes[1]=0x19; bytes[2]=0x64; bytes[3]=0x32;
+        bytes[4]=0x19; bytes[5]=0x00;
+        bytes[6]=(count << 4);
+    } else {
+        bytes[0]=0x14; bytes[1]=0x00; bytes[2]=0x3F; bytes[3]=0x70;
+        bytes[4]=0x9F; bytes[5]=0x01;
+        bytes[6]=(count << 4) | 0xA;
+    }
+    bytes[7] = CalcTeslaChecksum(bytes, 0x545);
+
+    bool active = MayTransmit(EMU_545);
+    if (active) can->Send(0x545, (uint32_t*)bytes, 8);
+    SetActiveBit(EMU_545, active);
+
+    mux = !mux;
+    count = (count + 1) & 0x0F;
 }
 
 
@@ -158,7 +281,7 @@ void Compressor::SendMessages(CanHardware* can)
     Bytes 6-7: Reserved (set to 0)
     */
 
-    int max_power = Param::GetInt(Param::compressor_plim); // Power limit in watts
+    int max_power = GetEffectivePowerLimit(); // Power limit in watts; never sent as 0
     int compressor_duty = Param::GetInt(Param::compressor_duty_request); // Duty cycle in 0.1%
 
     bool compressor_enable = (compressor_duty > 0);
@@ -173,7 +296,24 @@ void Compressor::SendMessages(CanHardware* can)
     bytes[6] = 0x00;                              // Reserved
     bytes[7] = 0x00;                              // Reserved
 
-    can->Send(0x281, (uint32_t*)bytes, 8); // Send message on VehicleBus
+    can->Send(0x281, (uint32_t*)bytes, 8); // Always sent, every 100ms - never arbitrated, compressor times out without it
+
+    SendMsg2D1(can);
+    SendMsg3A1(can);
+
+    // 0x321 only needs to appear at 1Hz; throttle our 100ms cadence down by 10.
+    static uint8_t divider321 = 0;
+    if (++divider321 >= 10)
+    {
+        divider321 = 0;
+        SendMsg321(can);
+    }
+}
+
+void Compressor::Send50ms(CanHardware* can)
+{
+    SendMsg221(can);
+    SendMsg545(can);
 }
 
 

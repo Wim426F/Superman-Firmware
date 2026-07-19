@@ -104,9 +104,14 @@ static void Ms10Task(void)
 }
 
 
+static void Ms50Task(void)
+{
+   Compressor::Send50ms(can); // VCFRONT emulation 0x221 / 0x545
+}
+
 
 static void Ms100Task(void)
-{  
+{
    iwdg_reset();
    float cpuLoad = scheduler->GetCpuLoad();
    Param::SetFloat(Param::cpuload, cpuLoad / 10);
@@ -114,10 +119,10 @@ static void Ms100Task(void)
    // Calculate 12V supply voltage from voltage divider
    float uauxGain = 203; // 1k/(5.1k+1k)/3.33v*4095 = 203
    Param::SetFloat(Param::uaux, ((float)AnaIn::uaux.Get()) / uauxGain);
-   
+
    //Set timestamp of error message
    ErrorMessage::SetTime(rtc_get_counter_val());
-   
+
    Interface::SendMessages(can);
    Compressor::SendMessages(can);
 
@@ -127,13 +132,11 @@ static void Ms100Task(void)
 
    //If we chose to send CAN messages every 100 ms, do this here.
    canMap->SendAll();
-}
 
-
-
-static void Ms200Task(void) 
-{
-   DigIo::led_out.Toggle();
+   // blink LED at 5Hz
+   static bool ledGate = false;
+   if (ledGate) DigIo::led_out.Toggle();
+   ledGate = !ledGate;
 }
 
 
@@ -155,8 +158,12 @@ static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) // Called wh
          Compressor::handle227(data);
       break;
 
-   case 0x2A8: // AC compressor HV status
-         Compressor::handle2A8(data);
+   case 0x221: // VCFRONT_LVPowerState (emulated by us; RX proves another node owns it)
+   case 0x2D1: // VCFRONT_okToUseHighPower
+   case 0x321: // VCFRONT_sensors
+   case 0x3A1: // VCFRONT_vehicleStatus
+   case 0x545: // VCFRONT 10Hz mux
+         Compressor::HandleEmuRx(id);
       break;
 
    default:
@@ -174,7 +181,11 @@ static void SetCanFilters()
    can->RegisterUserMessage(0x730); // Params
    can->RegisterUserMessage(0x731); // Setpoints and actual temperatures
    can->RegisterUserMessage(0x227); // AC compressor status flags
-   can->RegisterUserMessage(0x2A8); // AC compressor HV status
+   can->RegisterUserMessage(0x221); // VCFRONT_LVPowerState (emulation arbitration)
+   can->RegisterUserMessage(0x2D1); // VCFRONT_okToUseHighPower (emulation arbitration)
+   can->RegisterUserMessage(0x321); // VCFRONT_sensors (emulation arbitration)
+   can->RegisterUserMessage(0x3A1); // VCFRONT_vehicleStatus (emulation arbitration)
+   can->RegisterUserMessage(0x545); // VCFRONT 10Hz mux (emulation arbitration)
 }
 
 /** This function is called when the user changes a parameter */
@@ -306,10 +317,9 @@ extern "C" int main(void)
    //task length is in 0.5ms so must fill in double the wanted interval (327ms max)
    s.AddTask(Ms1_5Task, 3);     // 1.5ms actual, is very critical for smooth stepping!
    s.AddTask(Ms10Task, 20);   // 10ms actual
+   s.AddTask(Ms50Task, 100);  // 50ms actual
    s.AddTask(Ms100Task, 200); // 100ms actual
-   s.AddTask(Ms200Task, 400); // 200ms actual
-
-
+   
    Param::SetInt(Param::version, 0);
    Param::Change(Param::PARAM_LAST); //Call callback one for general parameter propagation
 

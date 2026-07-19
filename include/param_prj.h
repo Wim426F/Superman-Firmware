@@ -45,8 +45,8 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 11
-//Next value Id: 2050
+//Next param id (increase when adding new parameter!): 12
+//Next value Id: 2054
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
    PARAM_ENTRY(CAT_COMM,    canspeed,              CANSPEEDS,    0,      4,       2,       0  ) \
@@ -59,7 +59,8 @@
    PARAM_ENTRY(CAT_CTRL,    temp_powertrain_max,   "°C",        -30,     100,     50,      7  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_evaporator_setp,  "°C",        -30,     100,     5,       8  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_condensor_setp,   "°C",        -30,     100,     70,      9  ) \
-   PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      10000,   6000,    10 ) \
+   PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      10000,   8191,    10 ) \
+   PARAM_ENTRY(CAT_COMM,    canemu,                CANEMU,       0,      2,       0,       11 ) \
    VALUE_ENTRY(octovalve_position,          OCTOPOS,   2005 ) \
    VALUE_ENTRY(octovalve_setpoint,          OCTOPOS,   2044 ) \
    VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2046 ) \
@@ -102,6 +103,10 @@
    VALUE_ENTRY(compressor_temp,             "°C",      2041 ) \
    VALUE_ENTRY(compressor_power,            "W",       2042 ) \
    VALUE_ENTRY(radiatorfan_pwm,             "%",       2043 ) \
+   VALUE_ENTRY(emu_active,                  EMU_ACTIVE,2050 ) \
+   VALUE_ENTRY(compressor_state,            CMP_STATE, 2051 ) \
+   VALUE_ENTRY(compressor_ready,            ONOFF,     2052 ) \
+   VALUE_ENTRY(compressor_CANTimeout,       ONOFF,     2053 ) \
    VALUE_ENTRY(opmode,                      OPMODES,   2000 ) \
    VALUE_ENTRY(version,                     VERSTR,    2001 ) \
    VALUE_ENTRY(lasterr,                     errorListString,2002 ) \
@@ -125,6 +130,9 @@
 #define CANIO              "0=HW-IO, 1=CAN-IO"
 #define HWIO_SRC           "0=Ext1, 1=Ext2, 2=Ext3, 3=Ext4"
 #define ONOFF              "0=Off, 1=On, 2=na"
+#define CANEMU             "0=Auto, 1=AlwaysOn, 2=AlwaysOff"
+#define CMP_STATE          "0=None, 1=Normal, 2=Wait, 3=Fault, 4=SoftStart, 5=SoftShutdown, 15=SNA"
+#define EMU_ACTIVE         "0=None, 1=LVPowerState, 2=okToUseHighPower, 4=Sensors, 8=VehicleStatus, 16=Mux10Hz"
 #define CAT_TEST           "Testing"
 #define CAT_COMM           "Communication"
 #define CAT_CTRL           "Interface"
