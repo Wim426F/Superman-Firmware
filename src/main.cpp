@@ -50,7 +50,7 @@
 #include "thermal_control.h"
 
 
-#define CAN_TIMEOUT 50  //500ms
+#define CAN_TIMEOUT 100  //1s
 #define PRINT_JSON 0
 
 extern "C" void __cxa_pure_virtual() { while (1); }
@@ -77,21 +77,15 @@ static void Ms1_5Task(void) // used for step drivers, 1.5ms interval for step pu
 
 static void Ms10Task(void)
 {
-   static bool canIoActive = false;
-   int canio = Param::GetInt(Param::canio);
-   canIoActive |= canio != 0;
+   bool canIoFresh = Interface::last6E0Rx != 0 && (rtc_get_counter_val() - Interface::last6E0Rx) < CAN_TIMEOUT;
 
-   if ((rtc_get_counter_val() - can->GetLastRxTimestamp()) >= CAN_TIMEOUT && canIoActive)
+   if (!canIoFresh)
    {
-      canio = 0;
-      Param::SetInt(Param::canio, 0);
-      ErrorMessage::Post(ERR_CANTIMEOUT);
+      Param::SetInt(Param::heat_cabinl, DigIo::cabin_heatl.Get());
+      Param::SetInt(Param::heat_cabinr, DigIo::cabin_heatr.Get());
+      Param::SetInt(Param::cool_cabin, DigIo::cabin_cool.Get());
+      Param::SetInt(Param::preheat_req, DigIo::preheat_req.Get());
    }
-
-   Param::SetInt(Param::heat_cabinl, DigIo::cabin_heatl.Get());
-   Param::SetInt(Param::heat_cabinr, DigIo::cabin_heatr.Get());
-   Param::SetInt(Param::cool_cabin, DigIo::cabin_cool.Get());
-   Param::SetInt(Param::preheat_req, DigIo::preheat_req.Get());
 
    // Set pump RPM feedback (repurposing flow parameters for RPM)
    Param::SetInt(Param::pump_battery_flow, (int)Waterpump::batteryGetFlow());
@@ -146,12 +140,8 @@ static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) // Called wh
    dlc=dlc;
    switch (id)
    {
-   case 0x730: // Params
-         Interface::handle730(data);
-      break;
-
-   case 0x731: // Setpoints and actual temperatures
-         Interface::handle731(data);
+   case 0x6E0: // Cabin heat/cool/preheat requests (CAN-IO)
+         Interface::handle6E0(data);
       break;
    
    case 0x227: // AC compressor status flags
@@ -178,8 +168,7 @@ static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) // Called wh
 static void SetCanFilters()
 {
    //CanHardware* inverter_can = canInterface[Param::GetInt(Param::inv_can)];
-   can->RegisterUserMessage(0x730); // Params
-   can->RegisterUserMessage(0x731); // Setpoints and actual temperatures
+   can->RegisterUserMessage(0x6E0); // Setpoints and actual temperatures
    can->RegisterUserMessage(0x227); // AC compressor status flags
    can->RegisterUserMessage(0x221); // VCFRONT_LVPowerState (emulation arbitration)
    can->RegisterUserMessage(0x2D1); // VCFRONT_okToUseHighPower (emulation arbitration)
@@ -193,9 +182,6 @@ void Param::Change(Param::PARAM_NUM paramNum)
 {
    switch (paramNum)
    {
-   case Param::canspeed: 
-      can->SetBaudrate((CanHardware::baudrates)Param::GetInt(Param::canspeed));
-      break;
 
    case Param::nodeid:
       canSdo->SetNodeId(Param::GetInt(Param::nodeid)); //Set node ID for SDO access
@@ -293,7 +279,7 @@ extern "C" int main(void)
    //store a pointer for easier access
    FunctionPointerCallback canCb(CanCallback, SetCanFilters);
 
-   Stm32Can c(CAN1, (CanHardware::baudrates)Param::GetInt(Param::canspeed));
+   Stm32Can c(CAN1, CanHardware::Baud500);
    can = &c;
    can->AddCallback(&canCb);
    SetCanFilters();

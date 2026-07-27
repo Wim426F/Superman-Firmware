@@ -49,9 +49,7 @@
 //Next value Id: 2054
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
-   PARAM_ENTRY(CAT_COMM,    canspeed,              CANSPEEDS,    0,      4,       2,       0  ) \
    PARAM_ENTRY(CAT_COMM,    nodeid,                "",           1,      63,      50,      1  ) \
-   PARAM_ENTRY(CAT_COMM,    canio,                 CANIO,        0,      1,       0,       2  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_battery_setp,     "°C",        -30,     100,     20,      3  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_battery_min,      "°C",        -30,     100,     0,       4  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_battery_max,      "°C",        -30,     100,     50,      5  ) \
@@ -118,7 +116,6 @@
 #define VERSTR STRINGIFY(4=VERSION)
 
 #define OPMODES            "0=Off, 1=Run, 2=Preheat"
-#define CANSPEEDS          "0=125k, 1=250k, 2=500k, 3=800k, 4=1M"
 #define OCTOPOS            "0=Unknown, 1=Series, 2=Series, 3=AmbientSource, 4=RadiatorBypass, 5=Parallel"
 #define HEAT_TRNSFR_MODE   "0=Passive, 1=DominantHeating, 2=DominantCooling"
 #define BEST_SINK          "0=Ambient, 1=Battery"
@@ -127,7 +124,6 @@
 #define NTC                "0=JCurve, 1=KTY81-110, 2=KTY83-110, 3=KTY84-130, 4=Tesla_100K, 5=Tesla_10K, 6=PT1000"
 #define OPEN_CLOSE         "0=Open, 1=Closed"
 #define COOLANT_LEVEL      "0=Empty, 1=Minimum, 2=Nominal, 3=Max"
-#define CANIO              "0=HW-IO, 1=CAN-IO"
 #define HWIO_SRC           "0=Ext1, 1=Ext2, 2=Ext3, 3=Ext4"
 #define ONOFF              "0=Off, 1=On, 2=na"
 #define CANEMU             "0=Auto, 1=AlwaysOn, 2=AlwaysOff"
@@ -155,12 +151,6 @@ enum _modes
    MOD_RUN = 1,
    MOD_CHARGE = 2,
    MOD_FASTCHARGE = 3
-};
-
-enum _canio
-{
-   HW_IO = 0,
-   CAN_IO = 1
 };
 
 enum OctoPos

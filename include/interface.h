@@ -12,10 +12,11 @@ class Interface
 {
 
 public:
-    static void handle730(uint32_t data[2]);
-    static void handle731(uint32_t data[2]);
+    static void handle6E0(uint32_t data[2]);
 
     static void SendMessages(CanHardware* can);
+
+    static uint32_t last6E0Rx;
 
 };
 
