@@ -79,7 +79,5 @@ void Interface::SendMessages(CanHardware* can)
     // Byte 5: alive counter, increments every send
     bytes[5] = aliveCounter++;
 
-    // Bytes 6-7: reserved
-
-    can->Send(0x6E1, (uint32_t*)bytes, 8);
+    can->Send(0x6E1, (uint32_t*)bytes, 6);
 }

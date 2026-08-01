@@ -18,6 +18,7 @@
  */
 
 #include "thermal_control.h"
+#include "errormessage.h"
 #include <cstdint>
 #include <limits>
 #include <algorithm>
@@ -237,11 +238,13 @@ uint8_t runPiControl(float setpoint, float measured) {
 
     // Pressure overrides (incremental)
     if (highPressure > HIGH_PRESSURE_LIMIT) {
+        ErrorMessage::Post(ERR_REFRIGERANT_HIGHP);
         int newDuty = std::max(0, static_cast<int>(currentDuty - 1)); // Unload compressor
         Compressor::SetDuty(static_cast<uint8_t>(newDuty));
         return static_cast<uint8_t>(newDuty * 2.55f); // Scale for valve
     }
     if (lowPressure < LOW_PRESSURE_LIMIT) {
+        ErrorMessage::Post(ERR_REFRIGERANT_LOWP);
         int newDuty = std::max(0, static_cast<int>(currentDuty - 1)); // Unload compressor
         Compressor::SetDuty(static_cast<uint8_t>(newDuty));
         return static_cast<uint8_t>(newDuty * 2.55f);

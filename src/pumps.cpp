@@ -18,6 +18,7 @@
  */
 
 #include "pumps.h"
+#include "errormessage.h"
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/rtc.h>
@@ -27,6 +28,12 @@ extern volatile uint32_t pump_batt_period;
 extern volatile bool pump_batt_ready;
 extern volatile uint32_t pump_pt_period;
 extern volatile bool pump_pt_ready;
+
+#define COMPRESSOR_RX_TIMEOUT_TICKS 50  // 500ms
+static uint32_t last227Rx = 0;
+
+#define PUMP_STALL_TIMEOUT_TICKS 200 // 2000ms
+#define PUMP_STALL_MIN_DUTY 5       // %, below this we don't expect flow
 
 
 /* Tesla checksum: sum of bytes 0..6 plus both CAN ID bytes, truncated to 8 bits.
@@ -82,6 +89,8 @@ void Compressor::handle227(uint32_t data[2])
 
     uint8_t* bytes = (uint8_t*)data; // Convert to byte array
 
+    last227Rx = rtc_get_counter_val();
+
     // Read RPM
     int rpm = (bytes[1] << 8) | bytes[0];
     //Param::SetInt(Param::compressor_rpm, rpm);
@@ -114,6 +123,9 @@ void Compressor::handle227(uint32_t data[2])
     bool cmp_ready = (bytes[7] & 0x80) != 0;
     Param::SetInt(Param::compressor_state, cmp_state);
     Param::SetInt(Param::compressor_ready, cmp_ready ? 1 : 0);
+
+    if (cmp_state == 3 || cmp_state == 15) // FAULT or SNA (see CMP_state values above)
+        ErrorMessage::Post(ERR_COMPRESSOR_FAULT);
 
     // Rough HV power estimate: this compressor variant doesn't report power on CAN.
     // power ~= measured duty% x configured power limit.
@@ -281,6 +293,9 @@ void Compressor::SendMessages(CanHardware* can)
     Bytes 6-7: Reserved (set to 0)
     */
 
+    if (last227Rx != 0 && (rtc_get_counter_val() - last227Rx) >= COMPRESSOR_RX_TIMEOUT_TICKS)
+        ErrorMessage::Post(ERR_COMPRESSOR_TIMEOUT);
+
     int max_power = GetEffectivePowerLimit(); // Power limit in watts; never sent as 0
     int compressor_duty = Param::GetInt(Param::compressor_duty_request); // Duty cycle in 0.1%
 
@@ -358,4 +373,23 @@ float Waterpump::powertrainGetFlow()
 {
     if (pump_pt_period == 0) return 0.0f;
     return 30000000.0f / pump_pt_period;  // RPM (will be converted to LPM later)
+}
+
+void Waterpump::checkFaults()
+{
+    static uint32_t battLastEdge = 0;
+    static uint32_t ptLastEdge = 0;
+    uint32_t now = rtc_get_counter_val();
+
+    if (pump_batt_ready) { pump_batt_ready = false; battLastEdge = now; }
+    if (pump_pt_ready)   { pump_pt_ready = false;   ptLastEdge = now; }
+
+    // When commanded on but no tach pulse detected, the rotor isn't spinning.
+    if (Param::GetInt(Param::pump_battery_duty) > PUMP_STALL_MIN_DUTY &&
+        (now - battLastEdge) >= PUMP_STALL_TIMEOUT_TICKS)
+        ErrorMessage::Post(ERR_PUMP_BATTERY_FAULT);
+
+    if (Param::GetInt(Param::pump_powertrain_duty) > PUMP_STALL_MIN_DUTY &&
+        (now - ptLastEdge) >= PUMP_STALL_TIMEOUT_TICKS)
+        ErrorMessage::Post(ERR_PUMP_POWERTRAIN_FAULT);
 }

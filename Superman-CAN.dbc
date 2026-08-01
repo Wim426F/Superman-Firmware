@@ -1,0 +1,40 @@
+BO_ 1760 SUPERMAN_REQUEST: 8 VCU
+ SG_ CoolCabin : 0|8@1+ (1,0) [0|2] "" SUPERMAN
+ SG_ HeatCabinL : 8|8@1+ (1,0) [0|2] "" SUPERMAN
+ SG_ HeatCabinR : 16|8@1+ (1,0) [0|2] "" SUPERMAN
+ SG_ PreheatReq : 24|8@1+ (1,0) [0|2] "" SUPERMAN
+ SG_ TempBattery : 32|8@1+ (1,-40) [0|255] "degC" SUPERMAN
+ SG_ TempPowertrain : 40|8@1+ (1,-40) [0|255] "degC" SUPERMAN
+
+VAL_ 1760 CoolCabin 0 "Off" 1 "On" 2 "NA";
+VAL_ 1760 HeatCabinL 0 "Off" 1 "On" 2 "NA";
+VAL_ 1760 HeatCabinR 0 "Off" 1 "On" 2 "NA";
+VAL_ 1760 PreheatReq 0 "Off" 1 "On" 2 "NA";
+
+BO_ 1761 SUPERMAN_STATUS: 8 SUPERMAN
+ SG_ Opmode : 0|2@1+ (1,0) [0|2] "" VCU
+ SG_ CompressorState : 2|4@1+ (1,0) [0|15] "" VCU
+ SG_ HeatTransferMode : 6|2@1+ (1,0) [0|2] "" VCU
+ SG_ FaultCompressorTimeout : 8|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultCompressorFault : 9|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultRefrigerantHighP : 10|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultRefrigerantLowP : 11|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultPressureSensor : 12|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultTempSensor : 13|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultCoolantLow : 14|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultPumpBattery : 15|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultPumpPowertrain : 16|1@1+ (1,0) [0|1] "" VCU
+ SG_ FaultOctovalve : 17|1@1+ (1,0) [0|1] "" VCU
+ SG_ ThermalDemands : 24|8@1+ (1,0) [0|127] "" VCU
+ SG_ HvPower : 32|8@1+ (0.1,0) [0|25.5] "kW" VCU
+ SG_ AliveCounter : 40|8@1+ (1,0) [0|255] "" VCU
+
+CM_ SG_ 1761 Opmode "0=Off, 1=Run, 2=Preheat";
+CM_ SG_ 1761 CompressorState "0=None, 1=Normal, 2=Wait, 3=Fault, 4=SoftStart, 5=SoftShutdown, 15=SNA";
+CM_ SG_ 1761 HeatTransferMode "0=Passive, 1=DominantHeating, 2=DominantCooling";
+CM_ SG_ 1761 ThermalDemands "Bitmask: 1=CoolCabin, 2=CoolBattery, 4=CoolPowertrain, 8=HeatCabinL, 16=HeatCabinR, 32=HeatBattery, 64=RadiatorDefrost";
+CM_ SG_ 1761 HvPower "Compressor electrical power draw";
+
+VAL_ 1761 Opmode 0 "Off" 1 "Run" 2 "Preheat";
+VAL_ 1761 CompressorState 0 "None" 1 "Normal" 2 "Wait" 3 "Fault" 4 "SoftStart" 5 "SoftShutdown" 15 "SNA";
+VAL_ 1761 HeatTransferMode 0 "Passive" 1 "DominantHeating" 2 "DominantCooling";

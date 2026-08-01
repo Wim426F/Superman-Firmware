@@ -26,6 +26,7 @@ public:
     static void powertrainSetDuty(uint8_t duty); // duty in %
     static float batteryGetFlow();
     static float powertrainGetFlow();
+    static void checkFaults();
 };
 
 

@@ -50,7 +50,7 @@
 #include "thermal_control.h"
 
 
-#define CAN_TIMEOUT 100  //1s
+#define CAN_TIMEOUT 200  // 2s timeout for CANIO
 #define PRINT_JSON 0
 
 extern "C" void __cxa_pure_virtual() { while (1); }
@@ -90,6 +90,7 @@ static void Ms10Task(void)
    // Set pump RPM feedback (repurposing flow parameters for RPM)
    Param::SetInt(Param::pump_battery_flow, (int)Waterpump::batteryGetFlow());
    Param::SetInt(Param::pump_powertrain_flow, (int)Waterpump::powertrainGetFlow());
+   Waterpump::checkFaults();
 
    Valve::octoRunTask();
    Param::SetInt(Param::octovalve_position, Valve::octoGetPos());
