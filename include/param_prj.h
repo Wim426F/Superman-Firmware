@@ -45,8 +45,8 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 12
-//Next value Id: 2054
+//Next param id (increase when adding new parameter!): 16
+//Next value Id: 2064
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
    PARAM_ENTRY(CAT_COMM,    nodeid,                "",           1,      63,      50,      1  ) \
@@ -59,6 +59,10 @@
    PARAM_ENTRY(CAT_CTRL,    temp_condensor_setp,   "°C",        -30,     100,     70,      9  ) \
    PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      10000,   8191,    10 ) \
    PARAM_ENTRY(CAT_COMM,    canemu,                CANEMU,       0,      2,       0,       11 ) \
+   PARAM_ENTRY(CAT_COMM,    compressor_cmdid,      "",           0,      2047,    0,       12 ) \
+   PARAM_ENTRY(CAT_COMM,    compressor_sweep,      ONOFF,        0,      1,       0,       13 ) \
+   PARAM_ENTRY(CAT_COMM,    compressor_sweep_lo,   "",           1,      2047,    512,     14 ) \
+   PARAM_ENTRY(CAT_COMM,    compressor_sweep_hi,   "",           1,      2047,    1023,    15 ) \
    VALUE_ENTRY(octovalve_position,          OCTOPOS,   2005 ) \
    VALUE_ENTRY(octovalve_setpoint,          OCTOPOS,   2044 ) \
    VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2046 ) \
@@ -98,13 +102,21 @@
    VALUE_ENTRY(compressor_speed,            "rpm",     2038 ) \
    VALUE_ENTRY(compressor_duty_request,     "%",       2039 ) \
    VALUE_ENTRY(compressor_duty,             "%",       2040 ) \
-   VALUE_ENTRY(compressor_temp,             "°C",      2041 ) \
    VALUE_ENTRY(compressor_power,            "W",       2042 ) \
    VALUE_ENTRY(radiatorfan_pwm,             "%",       2043 ) \
    VALUE_ENTRY(emu_active,                  EMU_ACTIVE,2050 ) \
    VALUE_ENTRY(compressor_state,            CMP_STATE, 2051 ) \
    VALUE_ENTRY(compressor_ready,            ONOFF,     2052 ) \
-   VALUE_ENTRY(compressor_CANTimeout,       ONOFF,     2053 ) \
+   VALUE_ENTRY(compressor_HV,               "V",       2058 ) \
+   VALUE_ENTRY(compressor_plim_low,         ONOFF,     2057 ) \
+   VALUE_ENTRY(compressor_echo_plim,        "W",       2055 ) \
+   VALUE_ENTRY(compressor_cmd_ok,           ONOFF,     2056 ) \
+   VALUE_ENTRY(compressor_sweep_pos,        "",        2054 ) \
+   VALUE_ENTRY(compressor_hwid,             "",        2059 ) \
+   VALUE_ENTRY(compressor_componentid,      "",        2060 ) \
+   VALUE_ENTRY(compressor_flags,            "",        2061 ) \
+   VALUE_ENTRY(compressor_temp1,            "°C",      2062 ) \
+   VALUE_ENTRY(compressor_temp2,            "°C",      2063 ) \
    VALUE_ENTRY(opmode,                      OPMODES,   2000 ) \
    VALUE_ENTRY(version,                     VERSTR,    2001 ) \
    VALUE_ENTRY(lasterr,                     errorListString,2002 ) \
@@ -127,7 +139,7 @@
 #define HWIO_SRC           "0=Ext1, 1=Ext2, 2=Ext3, 3=Ext4"
 #define ONOFF              "0=Off, 1=On, 2=na"
 #define CANEMU             "0=Auto, 1=AlwaysOn, 2=AlwaysOff"
-#define CMP_STATE          "0=None, 1=Normal, 2=Wait, 3=Fault, 4=SoftStart, 5=SoftShutdown, 15=SNA"
+#define CMP_STATE          "0=Init, 1=Running, 2=Standby, 3=Fault, 4=Idle, 15=SNA"
 #define EMU_ACTIVE         "0=None, 1=LVPowerState, 2=okToUseHighPower, 4=Sensors, 8=VehicleStatus, 16=Mux10Hz"
 #define CAT_TEST           "Testing"
 #define CAT_COMM           "Communication"
