@@ -149,10 +149,6 @@ static bool CanCallback(uint32_t id, uint32_t data[2], uint8_t dlc) // Called wh
          Compressor::handle2A7(data);
       break;
 
-   case 0x2A6: // Compressor echo of our request
-         Compressor::handle2A6(data);
-      break;
-
    case 0x2C7: // Compressor, unidentified
          Compressor::handle2C7(data);
       break;
@@ -183,7 +179,6 @@ static void SetCanFilters()
    //CanHardware* inverter_can = canInterface[Param::GetInt(Param::inv_can)];
    can->RegisterUserMessage(0x6E0); // Setpoints and actual temperatures
    can->RegisterUserMessage(0x2A7); // Compressor state
-   can->RegisterUserMessage(0x2A6); // Compressor echo of our request
    can->RegisterUserMessage(0x2C7); // Compressor, unidentified
    can->RegisterUserMessage(0x366); // Compressor info (hardware/component id, app CRC)
    can->RegisterUserMessage(0x221); // VCFRONT_LVPowerState (emulation arbitration)

@@ -46,7 +46,7 @@
    3. Display values
  */
 //Next param id (increase when adding new parameter!): 16
-//Next value Id: 2064
+//Next value Id: 2066
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
    PARAM_ENTRY(CAT_COMM,    nodeid,                "",           1,      63,      50,      1  ) \
@@ -57,12 +57,8 @@
    PARAM_ENTRY(CAT_CTRL,    temp_powertrain_max,   "°C",        -30,     100,     50,      7  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_evaporator_setp,  "°C",        -30,     100,     5,       8  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_condensor_setp,   "°C",        -30,     100,     70,      9  ) \
-   PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      10000,   8191,    10 ) \
+   PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      6000,    6000,    10 ) \
    PARAM_ENTRY(CAT_COMM,    canemu,                CANEMU,       0,      2,       0,       11 ) \
-   PARAM_ENTRY(CAT_COMM,    compressor_cmdid,      "",           0,      2047,    0,       12 ) \
-   PARAM_ENTRY(CAT_COMM,    compressor_sweep,      ONOFF,        0,      1,       0,       13 ) \
-   PARAM_ENTRY(CAT_COMM,    compressor_sweep_lo,   "",           1,      2047,    512,     14 ) \
-   PARAM_ENTRY(CAT_COMM,    compressor_sweep_hi,   "",           1,      2047,    1023,    15 ) \
    VALUE_ENTRY(octovalve_position,          OCTOPOS,   2005 ) \
    VALUE_ENTRY(octovalve_setpoint,          OCTOPOS,   2044 ) \
    VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2046 ) \
@@ -98,20 +94,17 @@
    VALUE_ENTRY(pump_battery_duty,           "%",       2034 ) \
    VALUE_ENTRY(pump_powertrain_flow,        "rpm",     2035 ) \
    VALUE_ENTRY(pump_powertrain_duty,        "%",       2036 ) \
-   VALUE_ENTRY(compressor_enable,           "dig",     2037 ) \
+   VALUE_ENTRY(radiatorfan_pwm,             "%",       2043 ) \
+   VALUE_ENTRY(compressor_enable,           ONOFF,     2037 ) \
    VALUE_ENTRY(compressor_speed,            "rpm",     2038 ) \
    VALUE_ENTRY(compressor_duty_request,     "%",       2039 ) \
    VALUE_ENTRY(compressor_duty,             "%",       2040 ) \
    VALUE_ENTRY(compressor_power,            "W",       2042 ) \
-   VALUE_ENTRY(radiatorfan_pwm,             "%",       2043 ) \
    VALUE_ENTRY(emu_active,                  EMU_ACTIVE,2050 ) \
    VALUE_ENTRY(compressor_state,            CMP_STATE, 2051 ) \
-   VALUE_ENTRY(compressor_ready,            ONOFF,     2052 ) \
+   VALUE_ENTRY(compressor_ready,            BOOL,      2052 ) \
    VALUE_ENTRY(compressor_HV,               "V",       2058 ) \
-   VALUE_ENTRY(compressor_plim_low,         ONOFF,     2057 ) \
-   VALUE_ENTRY(compressor_echo_plim,        "W",       2055 ) \
-   VALUE_ENTRY(compressor_cmd_ok,           ONOFF,     2056 ) \
-   VALUE_ENTRY(compressor_sweep_pos,        "",        2054 ) \
+   VALUE_ENTRY(compressor_amps,             "A",       2065 ) \
    VALUE_ENTRY(compressor_hwid,             "",        2059 ) \
    VALUE_ENTRY(compressor_componentid,      "",        2060 ) \
    VALUE_ENTRY(compressor_flags,            "",        2061 ) \
@@ -133,11 +126,10 @@
 #define BEST_SINK          "0=Ambient, 1=Battery"
 #define BEST_SOURCE        "0=Ambient, 1=Battery, 2=Recirculation"
 #define THERMAL_DEMANDS    "0=None, 1=CoolCabin, 2=CoolBattery, 4=CoolPowertrain, 8=HeatCabinL, 16=HeatCabinR, 32=HeatBattery, 64=RadiatorDefrost"
-#define NTC                "0=JCurve, 1=KTY81-110, 2=KTY83-110, 3=KTY84-130, 4=Tesla_100K, 5=Tesla_10K, 6=PT1000"
 #define OPEN_CLOSE         "0=Open, 1=Closed"
 #define COOLANT_LEVEL      "0=Empty, 1=Minimum, 2=Nominal, 3=Max"
-#define HWIO_SRC           "0=Ext1, 1=Ext2, 2=Ext3, 3=Ext4"
 #define ONOFF              "0=Off, 1=On, 2=na"
+#define BOOL               "0=False, 1=True"
 #define CANEMU             "0=Auto, 1=AlwaysOn, 2=AlwaysOff"
 #define CMP_STATE          "0=Init, 1=Running, 2=Standby, 3=Fault, 4=Idle, 15=SNA"
 #define EMU_ACTIVE         "0=None, 1=LVPowerState, 2=okToUseHighPower, 4=Sensors, 8=VehicleStatus, 16=Mux10Hz"

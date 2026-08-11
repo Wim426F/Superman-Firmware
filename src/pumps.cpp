@@ -32,14 +32,6 @@ extern volatile bool pump_pt_ready;
 #define COMPRESSOR_RX_TIMEOUT_TICKS 50  // 500ms
 static uint32_t last2A7Rx = 0;
 
-/* Last VCFRONT_CMPPowerLimit the compressor echoed back on 0x2A6. Mirrored into
- * Param::compressor_echo_plim, kept here as well because the request id sweep
- * polls it faster than the UI does. Written from the CAN RX interrupt, read by
- * the 100ms task, hence volatile. */
-static volatile uint16_t lastEchoPlim = 0;
-
-#define ECHO_PLIM_NONE 0x1FFF // what the unit reports while it holds no valid request
-
 #define PUMP_STALL_TIMEOUT_TICKS 200 // 2000ms
 #define PUMP_STALL_MIN_DUTY 5       // %, below this we don't expect flow
 
@@ -53,95 +45,54 @@ static uint8_t CalcTeslaChecksum(const uint8_t* bytes, uint16_t id)
     return sum & 0xFF;
 }
 
-/* VCFRONT_CMPPowerLimit must never be sent as 0W - the real car holds it at
- * 8191W permanently, and the compressor apparently refuses to start if it
- * reads 0. Fall back to that value if the param is unset/0. */
-static int GetEffectivePowerLimit()
-{
-    int plim = Param::GetInt(Param::compressor_plim);
-    return (plim > 0) ? plim : 8191;
-}
-
-
-/* Extract a little endian signal, DBC "@1+" convention: bit numbering runs
- * LSB-first within each byte and carries on into the next byte. */
-static uint32_t GetBits(const uint8_t* b, int start, int len)
-{
-    uint32_t v = 0;
-    for (int i = 0; i < len; i++)
-    {
-        int bit = start + i;
-        v |= (uint32_t)((b[bit >> 3] >> (bit & 7)) & 1) << i;
-    }
-    return v;
-}
-
-
 void Compressor::handle2A7(uint32_t data[2])
 {
     /*
     0x2A7 - Compressor state, 100ms
 
     Bit  0, len 11: speedRPM                 x10, RPM
-    Bit 11, len 10: speedDuty                x0.1, %
+    Bit 11, len 10: speedDuty                x0.1, %   actual duty, not a command echo
     Bit 21, len 11: inputHVPower             x10, W
-    Bit 32, len  9: inputHVCurrent           x0.1, A   (not stored, no param)
+    Bit 32, len  9: inputHVCurrent           x0.1, A
     Bit 41, len 11: inputHVVoltage           x0.5, V
-    Bit 55, len  1: powerLimitActive                   (not stored, no param)
-    Bit 56, len  4: state
-    Bit 60, len  2: wasteHeatState                     (not stored, no param)
+    Bit 55, len  1: powerLimitActive
+    Bit 56, len  4: state : 0=INIT 1=RUNNING 2=STANDBY 3=FAULT 4=IDLE 15=SNA
+    Bit 60, len  2: wasteHeatState
     Bit 62, len  1: powerLimitTooLowToStart
     Bit 63, len  1: ready
-
-    state: 0=INIT 1=RUNNING 2=STANDBY 3=FAULT 4=IDLE 15=SNA
     */
 
     const uint8_t* b = (const uint8_t*)data;
 
     last2A7Rx = rtc_get_counter_val();
 
-    int state = GetBits(b, 56, 4);
+    int rpm   = b[0] | ((b[1] & 0x07) << 8);        // bits 0-10
+    int duty  = (b[1] >> 3) | ((b[2] & 0x1F) << 5); // bits 11-20
+    int power = (b[2] >> 5) | (b[3] << 3);          // bits 21-31
+    int amps  = b[4] | ((b[5] & 0x01) << 8);        // bits 32-40
+    int volts = (b[5] >> 1) | ((b[6] & 0x0F) << 7); // bits 41-51
+    int state = b[7] & 0x0F;                        // bits 56-59
 
-    Param::SetInt(Param::compressor_speed, GetBits(b, 0, 11) * 10);
-    Param::SetFloat(Param::compressor_duty, GetBits(b, 11, 10) * 0.1f);
-    Param::SetFloat(Param::compressor_HV, GetBits(b, 41, 11) * 0.5f);
+    Param::SetInt(Param::compressor_speed, rpm * 10);
+    Param::SetFloat(Param::compressor_duty, duty * 0.1f);
+    Param::SetFloat(Param::compressor_amps, amps * 0.1f);
+    Param::SetFloat(Param::compressor_HV, volts * 0.5f);
     Param::SetInt(Param::compressor_state, state);
-    Param::SetInt(Param::compressor_ready, GetBits(b, 63, 1));
-    Param::SetInt(Param::compressor_plim_low, GetBits(b, 62, 1));
+    Param::SetInt(Param::compressor_ready, b[7] >> 7);             // bit 63
+    //Param::SetInt(Param::compressor_plim_low, (b[7] >> 6) & 0x01); // bit 62, perhaps error flag: power limit too low to start.
 
     // The unit meters its own HV input, so this is measured rather than estimated.
-    Param::SetInt(Param::compressor_power, GetBits(b, 21, 11) * 10);
+    Param::SetInt(Param::compressor_power, power * 10);
 
     if (state == 3 || state == 15) // FAULT or SNA
         ErrorMessage::Post(ERR_COMPRESSOR_FAULT);
 }
 
 
-void Compressor::handle2A6(uint32_t data[2])
-{
-    /*
-    0x2A6 - echo of the request frame, 100ms. Same layout as the request:
-    bytes 0-1 target duty, bytes 2-3 power limit, byte 4 reset, byte 5 enable.
-
-    The power limit field reads ECHO_PLIM_NONE while the unit holds no valid
-    request, which is what makes the request id discoverable - see SweepTick().
-    */
-
-    const uint8_t* b = (const uint8_t*)data;
-
-    uint16_t echo = b[2] | (b[3] << 8);
-    lastEchoPlim = echo;
-
-    Param::SetInt(Param::compressor_echo_plim, echo);
-    Param::SetInt(Param::compressor_cmd_ok, (echo != ECHO_PLIM_NONE) ? 1 : 0);
-}
-
-
 void Compressor::handle366(uint32_t data[2])
 {
     /*
-    0x366 - info, 2.5s, muxed on byte 0. Only the identifying mux is decoded,
-    the rest are ignored.
+    0x366 - info, 2.5s, muxed on byte 0. Only the identifying mux is decoded.
     */
 
     const uint8_t* b = (const uint8_t*)data;
@@ -154,40 +105,45 @@ void Compressor::handle366(uint32_t data[2])
 }
 
 
-/* 0x2C7 - 100ms, alongside 0x2A7/0x2A6. Layout partially identified.
+/* 0x2C7 - 100ms. Flags plus temperatures.
  *
- * Observed over 615 frames on a bench log, only one bit ever changed:
- *
- *   38.74s  00 00 00 00 00 45 46 FF
- *   42.64s  00 01 00 00 00 45 46 FF
- *
- * Byte 1 bit 0 set 100ms before 0x2A7 dropped ready and fell from IDLE to
- * STANDBY, having sat 3.9s with no request arriving. Hypothesis: byte 1 is a
- * fault/status byte and bit 0 is the request timeout, successor to
- * CMP_VCFRONTCANTimeout which lived in 0x227 on the older unit. Unverified -
- * individual bits are not named until a valid request has been seen to clear
- * it. Exposed as a raw byte for now.
- *
- * Bytes 5 and 6 held 0x45 and 0x46 for the whole log. With the -40 offset used
- * throughout Tesla thermal messages that reads 29C and 30C, and ambient at the
- * time was 29C. Assumed to be temperatures, one likely the inverter, the other
- * ambient or suction. Which is which is unverified.
- *
- * Byte 7 constant 0xFF, assumed SNA. Bytes 0, 2, 3, 4 constant 0x00.
- * 
- * Byte 1 with no HV power is 17.
- * After HV powerup byte is 1.
- *
- * Structurally this is closer to the old 0x227 than 0x2A7 is: temperature plus
- * fault flags in one message, with speed and state split out into 0x2A7.
+ * Byte 1 bit 0: request timeout. clears when request on 0x2A1 arrives.
+ * Byte 1 bit 4: HV not present.
+ * Byte 5:       temperature, offset -40. Reads 0x00 on some units.
+ * Byte 6:       temperature, offset -40.
  */
+
+#define CMP_FLAG_TIMEOUT       0x01 // byte 1 bit 0
+#define CMP_FLAG_HV_MISSING    0x10 // byte 1 bit 4
+#define CMP_FLAG_TIMEOUT_TICKS 100  // 1000ms the flag must hold before we call it a fault
+
 void Compressor::handle2C7(uint32_t data[2])
 {
+    static uint32_t flagTimeoutSince = 0;
+
     const uint8_t* b = (const uint8_t*)data;
 
     Param::SetInt(Param::compressor_flags, b[1]);
+    //Param::SetInt(Param::compressor_hv_missing, (b[1] & CMP_FLAG_HV_MISSING) ? 1 : 0);
     Param::SetInt(Param::compressor_temp1, (int)b[5] - 40);
     Param::SetInt(Param::compressor_temp2, (int)b[6] - 40);
+
+    /* The compressor raises this flag during the gap between its own power up and our
+     * first request, so require it to hold before treating it as a fault. Once
+     * requests are flowing it clears in the very next frame. */
+    if (b[1] & CMP_FLAG_TIMEOUT)
+    {
+        uint32_t now = rtc_get_counter_val();
+
+        if (flagTimeoutSince == 0)
+            flagTimeoutSince = now;
+        else if ((now - flagTimeoutSince) > CMP_FLAG_TIMEOUT_TICKS)
+            ErrorMessage::Post(ERR_COMPRESSOR_TIMEOUT);
+    }
+    else
+    {
+        flagTimeoutSince = 0;
+    }
 }
 
 
@@ -338,7 +294,7 @@ static void SendMsg545(CanHardware* can)
 
 
 /* ---------------------------------------------------------------------
- * Compressor request
+ * Compressor request 0x2A1, DLC 8.
  *
  * Bytes 0-1: target duty in 0.1% increments (little endian).
  *            Example: 40% -> 400 -> 0x90 0x01
@@ -347,18 +303,11 @@ static void SendMsg545(CanHardware* can)
  * Byte 4:    reset (kept at 0)
  * Byte 5:    enable (1 to enable, 0 to disable)
  * Bytes 6-7: reserved (kept at 0)
- *
- * The id this goes out on isn't known from the logs, so it has to be found
- * with the sweep below and lives in Param::compressor_cmdid. Until that param
- * is set we transmit nothing rather than guess an id.
  * --------------------------------------------------------------------- */
 
-static void SendRequest(CanHardware* can)
+static void SendMsg2A1(CanHardware* can)
 {
-    int cmdId = Param::GetInt(Param::compressor_cmdid);
-    if (cmdId == 0) return; // request id not discovered yet
-
-    int max_power = GetEffectivePowerLimit(); // Power limit in watts; never sent as 0
+    int max_power = Param::GetInt(Param::compressor_plim);
     int compressor_duty = Param::GetInt(Param::compressor_duty_request); // Duty cycle in 0.1%
 
     bool compressor_enable = (compressor_duty > 0);
@@ -373,81 +322,7 @@ static void SendRequest(CanHardware* can)
     bytes[6] = 0x00;                              // reserved
     bytes[7] = 0x00;                              // reserved
 
-    can->Send(cmdId, (uint32_t*)bytes, 8); // Every 100ms - never arbitrated, compressor times out without it
-}
-
-
-/* ---------------------------------------------------------------------
- * Request id discovery sweep
- *
- * Walk candidate ids sending a probe that carries a power limit no other node
- * would ask for, and watch what 0x2A6 echoes back. The unit only echoes a
- * request it has accepted, so seeing our probe value come back identifies the
- * id it listens on.
- *
- * Duty and enable stay 0 in every probe, so landing on the right id can never
- * start the compressor.
- * --------------------------------------------------------------------- */
-
-#define SWEEP_PROBE_PLIM  6000 // distinctive value we look for coming back on 0x2A6
-#define SWEEP_DWELL_TICKS 4    // 400ms per candidate at the 100ms call rate
-
-static bool sweepRunning = false;
-static uint16_t sweepId = 0;
-static uint8_t sweepDwell = 0;
-
-static void StopSweep()
-{
-    sweepRunning = false;
-    Param::SetInt(Param::compressor_sweep, 0);
-}
-
-// Returns true while the sweep owns the request slot.
-static bool SweepTick(CanHardware* can)
-{
-    if (Param::GetInt(Param::compressor_sweep) == 0)
-    {
-        sweepRunning = false;
-        return false;
-    }
-
-    if (!sweepRunning)
-    {
-        sweepRunning = true;
-        sweepId = Param::GetInt(Param::compressor_sweep_lo);
-        sweepDwell = 0;
-        lastEchoPlim = 0;
-    }
-    else if (++sweepDwell >= SWEEP_DWELL_TICKS)
-    {
-        sweepDwell = 0;
-
-        if (lastEchoPlim == SWEEP_PROBE_PLIM) // the unit took our probe: this is the id
-        {
-            Param::SetInt(Param::compressor_cmdid, sweepId);
-            StopSweep();
-            return false;
-        }
-
-        sweepId++;
-        lastEchoPlim = 0; // don't let the previous candidate's echo score a hit
-
-        if (sweepId > Param::GetInt(Param::compressor_sweep_hi))
-        {
-            StopSweep();
-            return false;
-        }
-    }
-
-    Param::SetInt(Param::compressor_sweep_pos, sweepId);
-
-    uint8_t bytes[8] = {0};
-    bytes[2] = lowByte(SWEEP_PROBE_PLIM);
-    bytes[3] = highByte(SWEEP_PROBE_PLIM);
-    // bytes 0-1 duty, byte 4 reset and byte 5 enable all stay 0
-
-    can->Send(sweepId, (uint32_t*)bytes, 8);
-    return true;
+    can->Send(0x2A1, (uint32_t*)bytes, 8); // Every 100ms - never arbitrated, compressor times out without it
 }
 
 
@@ -456,15 +331,11 @@ void Compressor::SendMessages(CanHardware* can)
     if (last2A7Rx != 0 && (rtc_get_counter_val() - last2A7Rx) >= COMPRESSOR_RX_TIMEOUT_TICKS)
         ErrorMessage::Post(ERR_COMPRESSOR_TIMEOUT);
 
-    // While sweeping, the probe replaces the normal request so we never drive
-    // two ids in one tick. The VCFRONT emulation below keeps running either way.
-    if (!SweepTick(can))
-        SendRequest(can);
-
+    SendMsg2A1(can); // Compressor request
     SendMsg2D1(can);
     SendMsg3A1(can);
 
-    // 0x321 only needs to appear at 1Hz; throttle our 100ms cadence down by 10.
+    // 0x321 only needs to appear at 1Hz
     static uint8_t divider321 = 0;
     if (++divider321 >= 10)
     {

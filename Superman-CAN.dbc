@@ -1,3 +1,5 @@
+BU_: SUPERMAN VCU CMPD VCFRONT
+
 BO_ 1760 SUPERMAN_REQUEST: 8 VCU
  SG_ CoolCabin : 0|8@1+ (1,0) [0|2] "" SUPERMAN
  SG_ HeatCabinL : 8|8@1+ (1,0) [0|2] "" SUPERMAN
@@ -38,3 +40,57 @@ CM_ SG_ 1761 HvPower "Compressor electrical power draw";
 VAL_ 1761 Opmode 0 "Off" 1 "Run" 2 "Preheat";
 VAL_ 1761 CompressorState 0 "None" 1 "Normal" 2 "Wait" 3 "Fault" 4 "SoftStart" 5 "SoftShutdown" 15 "SNA";
 VAL_ 1761 HeatTransferMode 0 "Passive" 1 "DominantHeating" 2 "DominantCooling";
+
+BO_ 673 ID2A1VCFRONT_CMPDRequest: 8 VCFRONT
+ SG_ VCFRONT_CMPDTargetDuty : 0|16@1+ (0.1,0) [0|6553.5] "%"  CMPD
+ SG_ VCFRONT_CMPDPowerLimit : 16|16@1+ (1,0) [0|65535] "W"  CMPD
+ SG_ VCFRONT_CMPDReset : 32|8@1+ (1,0) [0|255] ""  CMPD
+ SG_ VCFRONT_CMPDEnable : 40|8@1+ (1,0) [0|255] ""  CMPD
+
+VAL_ 673 VCFRONT_CMPDEnable 0 "DISABLED" 1 "ENABLED" ;
+
+BO_ 679 ID2A7CMPD_state: 8 CMPD
+ SG_ CMPD_speedRPM : 0|11@1+ (10,0) [0|20470] "RPM"  VCFRONT
+ SG_ CMPD_speedDuty : 11|10@1+ (0.1,0) [0|102.3] "%"  VCFRONT
+ SG_ CMPD_inputHVPower : 21|11@1+ (10,0) [0|20470] "W"  VCFRONT
+ SG_ CMPD_inputHVCurrent : 32|9@1+ (0.1,0) [0|51.1] "A"  VCFRONT
+ SG_ CMPD_inputHVVoltage : 41|11@1+ (0.5,0) [0|1023.5] "V"  VCFRONT
+ SG_ CMPD_powerLimitActive : 55|1@1+ (1,0) [0|1] ""  VCFRONT
+ SG_ CMPD_state : 56|4@1+ (1,0) [0|15] ""  VCFRONT
+ SG_ CMPD_wasteHeatState : 60|2@1+ (1,0) [0|3] ""  VCFRONT
+ SG_ CMPD_powerLimitTooLowToStart : 62|1@1+ (1,0) [0|1] ""  VCFRONT
+ SG_ CMPD_ready : 63|1@1+ (1,0) [0|1] ""  VCFRONT
+
+VAL_ 679 CMPD_state 0 "INIT" 1 "RUNNING" 2 "STANDBY" 3 "FAULT" 4 "IDLE" 15 "SNA" ;
+VAL_ 679 CMPD_wasteHeatState 0 "OFF" 1 "ACTIVE" 3 "NOT_AVAILABLE" ;
+VAL_ 679 CMPD_ready 0 "NOT_READY" 1 "READY" ;
+
+BO_ 711 ID2C7CMPD_statusTemps: 8 CMPD
+ SG_ CMPD_flags : 8|8@1+ (1,0) [0|255] ""  VCFRONT
+ SG_ CMPD_faultCommsTimeout : 8|1@1+ (1,0) [0|1] ""  VCFRONT
+ SG_ CMPD_temp1 : 40|8@1+ (1,-40) [-40|215] "degC"  VCFRONT
+ SG_ CMPD_temp2 : 48|8@1+ (1,-40) [-40|215] "degC"  VCFRONT
+
+BO_ 870 ID366CMPD_info: 8 CMPD
+ SG_ CMPD_infoIndex M : 0|8@1+ (1,0) [0|255] ""  VCFRONT
+ SG_ CMPD_infoBuildType m10 : 8|8@1+ (1,0) [0|255] ""  VCFRONT
+ SG_ CMPD_infoBuildConfigId m10 : 16|16@1+ (1,0) [0|65535] ""  VCFRONT
+ SG_ CMPD_infoHardwareId m10 : 32|16@1+ (1,0) [0|65535] ""  VCFRONT
+ SG_ CMPD_infoComponentId m10 : 48|16@1+ (1,0) [0|65535] ""  VCFRONT
+ SG_ CMPD_infoPcbaId m11 : 8|8@1+ (1,0) [0|255] ""  VCFRONT
+ SG_ CMPD_infoAssemblyId m11 : 16|8@1+ (1,0) [0|255] ""  VCFRONT
+ SG_ CMPD_infoUsageId m11 : 24|16@1+ (1,0) [0|65535] ""  VCFRONT
+ SG_ CMPD_infoSubUsageId m11 : 40|16@1+ (1,0) [0|65535] ""  VCFRONT
+ SG_ CMPD_infoPlatformType m13 : 8|8@1+ (1,0) [0|255] ""  VCFRONT
+ SG_ CMPD_infoAppCrc m13 : 32|32@1+ (1,0) [0|4294967295] ""  VCFRONT
+ SG_ CMPD_infoBootUdsProtoVersion m20 : 8|8@1+ (1,0) [0|255] ""  VCFRONT
+ SG_ CMPD_infoBootCrc m20 : 32|32@1+ (1,0) [0|4294967295] ""  VCFRONT
+
+BO_ 1588 ID634CMPD_bootAnnounce: 8 CMPD
+ SG_ CMPD_bootComponentId : 8|8@1+ (1,0) [0|255] ""  VCFRONT
+
+BO_ 1559 ID617CMPD_udsResponse: 8 CMPD
+ SG_ CMPD_udsResponseByte0 : 0|8@1+ (1,0) [0|255] ""  VCFRONT
+
+BO_ 1543 ID607CMPD_udsRequest: 8 VCFRONT
+ SG_ CMPD_udsRequestByte0 : 0|8@1+ (1,0) [0|255] ""  CMPD
