@@ -174,6 +174,9 @@ void Compressor::handle366(uint32_t data[2])
  * ambient or suction. Which is which is unverified.
  *
  * Byte 7 constant 0xFF, assumed SNA. Bytes 0, 2, 3, 4 constant 0x00.
+ * 
+ * Byte 1 with no HV power is 17.
+ * After HV powerup byte is 1.
  *
  * Structurally this is closer to the old 0x227 than 0x2A7 is: temperature plus
  * fault flags in one message, with speed and state split out into 0x2A7.

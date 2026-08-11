@@ -188,13 +188,13 @@ void Valve::expansionCalibrateAll()
 
 void Valve::coolantCondensorOpen()
 {
-    DigIo::valve_lcc.Clear();
+    DigIo::valve_lcc.Set();
 	Param::SetInt(Param::valve_coolant_condensor, 0);
 }
 
 void Valve::coolantCondensorClose()
 {
-    DigIo::valve_lcc.Set();
+    DigIo::valve_lcc.Clear();
 	Param::SetInt(Param::valve_coolant_condensor, 1);
 }
 
