@@ -38,14 +38,14 @@
  * IDs are 16 bit, so 65535 is the maximum
  */
 
-#define VERSION 0.6.superman
+#define VERSION 0.6.hwtest
 
 /* Entries must be ordered as follows:
    1. Saveable parameters (id != 0)
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 25
+//Next param id (increase when adding new parameter!): 27
 //Next value Id: 2066
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
@@ -73,6 +73,8 @@
    PARAM_ENTRY(CAT_TEST,    test_compressor_duty,  "%",          0,      100,     0,       20 ) \
    PARAM_ENTRY(CAT_TEST,    test_calibrate_expv,   ONOFF,        0,      1,       0,       21 ) \
    PARAM_ENTRY(CAT_TEST,    test_calibrate_octo,   ONOFF,        0,      1,       0,       22 ) \
+   PARAM_ENTRY(CAT_TEST,    fan_duty,              "%",          0,      100,     0,       25 ) \
+   PARAM_ENTRY(CAT_TEST,    pump_duty,             "%",          0,      100,     0,       26 ) \
    VALUE_ENTRY(octovalve_position,          OCTOPOS,   2005 ) \
    VALUE_ENTRY(octovalve_setpoint,          OCTOPOS,   2044 ) \
    VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2046 ) \

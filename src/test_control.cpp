@@ -22,6 +22,7 @@
 #include "pumps.h"
 #include "params.h"
 #include "errormessage.h"
+#include "utils.h"
 
 // Minimum expansion-valve opening (0..255) required before the compressor may run.
 // Guards against the one destructive bench mistake: running the compressor into a
@@ -71,4 +72,8 @@ void testControl()
     {
         Compressor::SetDuty(requestedDuty);
     }
+
+    // --- Manual actuator duty overrides for bench wiring checks ---
+    pwm_write(static_cast<uint8_t>(Param::GetInt(Param::fan_duty)), PWM_FAN_TIM, PWM_FAN_OC, PWM_FAN_ARR);
+    pwm_write(static_cast<uint8_t>(Param::GetInt(Param::pump_duty)), PWM_PUMP_TIM, PWM_PUMP_OC, PWM_PUMP_ARR);
 }
