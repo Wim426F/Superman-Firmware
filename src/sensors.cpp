@@ -1,9 +1,15 @@
 #include "sensors.h"
+#include "errormessage.h"
 #include "math.h"
 #include "Ewma.h"
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/rtc.h>
+
+// A raw reading pinned at its sensor's rail for this many GetSensorReadings()
+// cycles (100ms each) means open/short circuit, not a real extreme reading.
+#define SENSOR_PIN_FAULT_CYCLES 20 // 2000ms
+static inline bool pinned(float raw, float lo, float hi) { return raw <= lo || raw >= hi; }
 
 /* ---------------------------------------------------------------------------
  * Coolant reservoir level (capacitive sensor on PB1 / ADC12_IN9)
@@ -157,8 +163,10 @@ void UpdateReservoirLevel()
          float raw_uF = (tSec / RESERVOIR_SERIES_R) * 1e6f;
          float uF     = reserv_filter.filter(raw_uF * RESERVOIR_UF_CAL);
 
+         uint8_t level = reservoirBucket(uF);
          Param::SetFloat(Param::reservoir_cap, uF);
-         Param::SetInt(Param::reservoir_level, reservoirBucket(uF));
+         Param::SetInt(Param::reservoir_level, level);
+         if (level <= COOLANT_MINIMUM) ErrorMessage::Post(ERR_COOLANT_LOW);
       }
       else
       {
@@ -171,14 +179,14 @@ void UpdateReservoirLevel()
 
 void GetSensorReadings()
 {
-    float pps1 = (float)AnaIn::pressure_inlet_compressor.Get(); // low side sensor
-    float pps2 = (float)AnaIn::pressure_outlet_compressor.Get(); // high side sensor
-    float pps3 = (float)AnaIn::pressure_pre_evaporator.Get(); // low side sensor
-    
+    float pps1raw = (float)AnaIn::pressure_inlet_compressor.Get(); // low side sensor
+    float pps2raw = (float)AnaIn::pressure_outlet_compressor.Get(); // high side sensor
+    float pps3raw = (float)AnaIn::pressure_pre_evaporator.Get(); // low side sensor
+
     // needs an offset because sensor starts measuring above certain treshold
-    pps1 = utils::changeFloat(pps1, 590, 4096, 0, LOWPRESSURE_SENSOR); // low side sensor
-    pps2 = utils::changeFloat(pps2, 370, 4096, 0, HIGHPRESSURE_SENSOR); // high side sensor
-    pps3 = utils::changeFloat(pps3, 590, 4096, 0, LOWPRESSURE_SENSOR); // low side sensor
+    float pps1 = utils::changeFloat(pps1raw, 590, 4096, 0, LOWPRESSURE_SENSOR); // low side sensor
+    float pps2 = utils::changeFloat(pps2raw, 370, 4096, 0, HIGHPRESSURE_SENSOR); // high side sensor
+    float pps3 = utils::changeFloat(pps3raw, 590, 4096, 0, LOWPRESSURE_SENSOR); // low side sensor
 
     pps1 = utils::limitVal(pps1, 0, LOWPRESSURE_SENSOR);
     pps2 = utils::limitVal(pps2, 0, HIGHPRESSURE_SENSOR);
@@ -189,15 +197,40 @@ void GetSensorReadings()
     Param::SetFloat(Param::pressure_pre_evaporator,     ps3_filter.filter(pps3)); // low side sensor
 
     // resistance gets lower when hotter (ntc)
-    Param::SetFloat(Param::temp_inlet_compressor,   ps1t_filter.filter(TempMeas::Lookup(AnaIn::temp_inlet_compressor.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_ps1_offset);
-    Param::SetFloat(Param::temp_outlet_compressor,  ps2t_filter.filter(TempMeas::Lookup(AnaIn::temp_outlet_compressor.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_ps2_offset);
-    Param::SetFloat(Param::temp_pre_evaporator,     ps3t_filter.filter(TempMeas::Lookup(AnaIn::temp_pre_evaporator.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_ps3_offset);
+    float t1 = TempMeas::Lookup(AnaIn::temp_inlet_compressor.Get(),  TempMeas::TEMP_TESLA_10K);
+    float t2 = TempMeas::Lookup(AnaIn::temp_outlet_compressor.Get(), TempMeas::TEMP_TESLA_10K);
+    float t3 = TempMeas::Lookup(AnaIn::temp_pre_evaporator.Get(),    TempMeas::TEMP_TESLA_10K);
+    float t4 = TempMeas::Lookup(AnaIn::temp_inlet_battery.Get(),     TempMeas::TEMP_GE1935);
+    float t5 = TempMeas::Lookup(AnaIn::temp_inlet_powertrain.Get(),  TempMeas::TEMP_GE1935);
+    float t6 = TempMeas::Lookup(AnaIn::temp_radiator.Get(),          TempMeas::TEMP_GE1935);
+    float t7 = TempMeas::Lookup(AnaIn::temp_ambient.Get(),           TempMeas::TEMP_GE1935);
+    float t8 = TempMeas::Lookup(AnaIn::temp_battery.Get(),           TempMeas::TEMP_GE1935);
+    float t9 = TempMeas::Lookup(AnaIn::temp_powertrain.Get(),        TempMeas::TEMP_GE1935);
 
-    Param::SetFloat(Param::temp_inlet_battery,      battin_filter.filter( TempMeas::Lookup(AnaIn::temp_inlet_battery.Get(), TempMeas::TEMP_TESLA_10K) ) - temp_battin_offset);
-    Param::SetFloat(Param::temp_inlet_powertrain,   ptinfilter.filter   ( TempMeas::Lookup(AnaIn::temp_inlet_powertrain.Get()  , TempMeas::TEMP_TESLA_10K) ) - temp_ptin_offset);
-    
-    Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(TempMeas::Lookup(AnaIn::temp_radiator.Get(), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_ambient,        ambient_filter.filter(TempMeas::Lookup(AnaIn::temp_ambient.Get(), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_battery,        battery_filter.filter(TempMeas::Lookup(AnaIn::temp_battery.Get(), TempMeas::TEMP_TESLA_10K)));
-    Param::SetFloat(Param::temp_powertrain,     powertrain_filter.filter(TempMeas::Lookup(AnaIn::temp_powertrain.Get(), TempMeas::TEMP_TESLA_10K)));
+    Param::SetFloat(Param::temp_inlet_compressor,   ps1t_filter.filter(t1) - temp_ps1_offset);
+    Param::SetFloat(Param::temp_outlet_compressor,  ps2t_filter.filter(t2) - temp_ps2_offset);
+    Param::SetFloat(Param::temp_pre_evaporator,     ps3t_filter.filter(t3) - temp_ps3_offset);
+
+    Param::SetFloat(Param::temp_inlet_battery,      battin_filter.filter(t4) - temp_battin_offset);
+    Param::SetFloat(Param::temp_inlet_powertrain,   ptinfilter.filter(t5)   - temp_ptin_offset);
+
+    Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(t6));
+    Param::SetFloat(Param::temp_ambient,        ambient_filter.filter(t7));
+    Param::SetFloat(Param::temp_battery,        battery_filter.filter(t8));
+    Param::SetFloat(Param::temp_powertrain,     powertrain_filter.filter(t9));
+
+    // Check if sensor reads at rail voltage, in that case throw error.
+    bool pressurePinned = pinned(pps1raw, 5, 4090) || pinned(pps2raw, 5, 4090) || pinned(pps3raw, 5, 4090);
+    bool tempPinned = pinned(t1, -30, 110) || pinned(t2, -30, 110) || pinned(t3, -30, 110) // TESLA_10K
+                    || pinned(t4, -40, 120) || pinned(t5, -40, 120) || pinned(t6, -40, 120)
+                    || pinned(t7, -40, 120) || pinned(t8, -40, 120) || pinned(t9, -40, 120); // GE1935
+
+    static uint16_t pressurePinCount = 0;
+    static uint16_t tempPinCount = 0;
+
+    pressurePinCount = pressurePinned ? (pressurePinCount + 1) : 0;
+    if (pressurePinCount >= SENSOR_PIN_FAULT_CYCLES) ErrorMessage::Post(ERR_PRESSURE_SENSOR_FAULT);
+
+    tempPinCount = tempPinned ? (tempPinCount + 1) : 0;
+    if (tempPinCount >= SENSOR_PIN_FAULT_CYCLES) ErrorMessage::Post(ERR_TEMP_SENSOR_FAULT);
 }

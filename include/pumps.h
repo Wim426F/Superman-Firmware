@@ -11,10 +11,13 @@
 class Compressor
 {
 public:
-    static void handle2A8(uint32_t data[2]);
-    static void handle227(uint32_t data[2]);
-    static void SendMessages(CanHardware* can);
-    static void SetDuty(int duty); // percentage   
+    static void handle2A7(uint32_t data[2]);
+    static void handle2C7(uint32_t data[2]);
+    static void handle366(uint32_t data[2]);
+    static void HandleEmuRx(uint32_t id); 
+    static void SendMessages(CanHardware* can); 
+    static void Send50ms(CanHardware* can);
+    static void SetDuty(int duty); // percentage
     static int GetDuty(); // percentage
 };
 
@@ -25,6 +28,7 @@ public:
     static void powertrainSetDuty(uint8_t duty); // duty in %
     static float batteryGetFlow();
     static float powertrainGetFlow();
+    static void checkFaults();
 };
 
 

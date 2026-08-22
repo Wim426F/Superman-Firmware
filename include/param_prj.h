@@ -45,13 +45,11 @@
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 24
-//Next value Id: 2050
+//Next param id (increase when adding new parameter!): 25
+//Next value Id: 2066
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
-   PARAM_ENTRY(CAT_COMM,    canspeed,              CANSPEEDS,    0,      4,       2,       0  ) \
    PARAM_ENTRY(CAT_COMM,    nodeid,                "",           1,      63,      50,      1  ) \
-   PARAM_ENTRY(CAT_COMM,    canio,                 CANIO,        0,      1,       0,       2  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_battery_setp,     "°C",        -30,     100,     20,      3  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_battery_min,      "°C",        -30,     100,     0,       4  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_battery_max,      "°C",        -30,     100,     50,      5  ) \
@@ -59,21 +57,22 @@
    PARAM_ENTRY(CAT_CTRL,    temp_powertrain_max,   "°C",        -30,     100,     50,      7  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_evaporator_setp,  "°C",        -30,     100,     5,       8  ) \
    PARAM_ENTRY(CAT_CTRL,    temp_condensor_setp,   "°C",        -30,     100,     70,      9  ) \
-   PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      10000,   6000,    10 ) \
-   /* --- Hardware bring-up test mode (hardware-test build only). Defaults are safe (all off/closed). --- */ \
-   PARAM_ENTRY(CAT_TEST,    test_expv_evap_coolant,"dig",        0,      255,     0,       11 ) \
-   PARAM_ENTRY(CAT_TEST,    test_expv_evap_cabin,  "dig",        0,      255,     0,       12 ) \
-   PARAM_ENTRY(CAT_TEST,    test_expv_evap_recirc, "dig",        0,      255,     0,       13 ) \
-   PARAM_ENTRY(CAT_TEST,    test_expv_cond_coolant,"dig",        0,      255,     0,       14 ) \
-   PARAM_ENTRY(CAT_TEST,    test_expv_cond_cabinl, "dig",        0,      255,     0,       15 ) \
-   PARAM_ENTRY(CAT_TEST,    test_expv_cond_cabinr, "dig",        0,      255,     0,       16 ) \
-   PARAM_ENTRY(CAT_TEST,    test_valve_condensor,  OPEN_CLOSE,   0,      1,       0,       23 ) \
-   PARAM_ENTRY(CAT_TEST,    test_pump_battery,     "%",          0,      100,     0,       17 ) \
-   PARAM_ENTRY(CAT_TEST,    test_pump_powertrain,  "%",          0,      100,     0,       18 ) \
-   PARAM_ENTRY(CAT_TEST,    test_octo_pos,         OCTOPOS,      0,      5,       0,       19 ) \
-   PARAM_ENTRY(CAT_TEST,    test_compressor_duty,  "%",          0,      100,     0,       20 ) \
-   PARAM_ENTRY(CAT_TEST,    test_calibrate_expv,   ONOFF,        0,      1,       0,       21 ) \
-   PARAM_ENTRY(CAT_TEST,    test_calibrate_octo,   ONOFF,        0,      1,       0,       22 ) \
+    PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      6000,    6000,    10 ) \
+    PARAM_ENTRY(CAT_COMM,    canemu,                CANEMU,       0,      2,       0,       11 ) \
+    /* --- Hardware bring-up test mode (hardware-test build only). Defaults are safe (all off/closed). --- */ \
+    PARAM_ENTRY(CAT_TEST,    test_expv_evap_coolant,"dig",        0,      255,     0,       24 ) \
+    PARAM_ENTRY(CAT_TEST,    test_expv_evap_cabin,  "dig",        0,      255,     0,       12 ) \
+    PARAM_ENTRY(CAT_TEST,    test_expv_evap_recirc, "dig",        0,      255,     0,       13 ) \
+    PARAM_ENTRY(CAT_TEST,    test_expv_cond_coolant,"dig",        0,      255,     0,       14 ) \
+    PARAM_ENTRY(CAT_TEST,    test_expv_cond_cabinl, "dig",        0,      255,     0,       15 ) \
+    PARAM_ENTRY(CAT_TEST,    test_expv_cond_cabinr, "dig",        0,      255,     0,       16 ) \
+    PARAM_ENTRY(CAT_TEST,    test_valve_condensor,  OPEN_CLOSE,   0,      1,       0,       23 ) \
+    PARAM_ENTRY(CAT_TEST,    test_pump_battery,     "%",          0,      100,     0,       17 ) \
+    PARAM_ENTRY(CAT_TEST,    test_pump_powertrain,  "%",          0,      100,     0,       18 ) \
+    PARAM_ENTRY(CAT_TEST,    test_octo_pos,         OCTOPOS,      0,      5,       0,       19 ) \
+    PARAM_ENTRY(CAT_TEST,    test_compressor_duty,  "%",          0,      100,     0,       20 ) \
+    PARAM_ENTRY(CAT_TEST,    test_calibrate_expv,   ONOFF,        0,      1,       0,       21 ) \
+    PARAM_ENTRY(CAT_TEST,    test_calibrate_octo,   ONOFF,        0,      1,       0,       22 ) \
    VALUE_ENTRY(octovalve_position,          OCTOPOS,   2005 ) \
    VALUE_ENTRY(octovalve_setpoint,          OCTOPOS,   2044 ) \
    VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2046 ) \
@@ -109,13 +108,22 @@
    VALUE_ENTRY(pump_battery_duty,           "%",       2034 ) \
    VALUE_ENTRY(pump_powertrain_flow,        "rpm",     2035 ) \
    VALUE_ENTRY(pump_powertrain_duty,        "%",       2036 ) \
-   VALUE_ENTRY(compressor_enable,           "dig",     2037 ) \
+   VALUE_ENTRY(radiatorfan_pwm,             "%",       2043 ) \
+   VALUE_ENTRY(compressor_enable,           ONOFF,     2037 ) \
    VALUE_ENTRY(compressor_speed,            "rpm",     2038 ) \
    VALUE_ENTRY(compressor_duty_request,     "%",       2039 ) \
    VALUE_ENTRY(compressor_duty,             "%",       2040 ) \
-   VALUE_ENTRY(compressor_temp,             "°C",      2041 ) \
    VALUE_ENTRY(compressor_power,            "W",       2042 ) \
-   VALUE_ENTRY(radiatorfan_pwm,             "%",       2043 ) \
+   VALUE_ENTRY(emu_active,                  EMU_ACTIVE,2050 ) \
+   VALUE_ENTRY(compressor_state,            CMP_STATE, 2051 ) \
+   VALUE_ENTRY(compressor_ready,            BOOL,      2052 ) \
+   VALUE_ENTRY(compressor_HV,               "V",       2058 ) \
+   VALUE_ENTRY(compressor_amps,             "A",       2065 ) \
+   VALUE_ENTRY(compressor_hwid,             "",        2059 ) \
+   VALUE_ENTRY(compressor_componentid,      "",        2060 ) \
+   VALUE_ENTRY(compressor_flags,            "",        2061 ) \
+   VALUE_ENTRY(compressor_temp1,            "°C",      2062 ) \
+   VALUE_ENTRY(compressor_temp2,            "°C",      2063 ) \
    VALUE_ENTRY(opmode,                      OPMODES,   2000 ) \
    VALUE_ENTRY(version,                     VERSTR,    2001 ) \
    VALUE_ENTRY(lasterr,                     errorListString,2002 ) \
@@ -127,18 +135,18 @@
 #define VERSTR STRINGIFY(4=VERSION)
 
 #define OPMODES            "0=Off, 1=Run, 2=Preheat"
-#define CANSPEEDS          "0=125k, 1=250k, 2=500k, 3=800k, 4=1M"
 #define OCTOPOS            "0=Unknown, 1=Series, 2=Series, 3=AmbientSource, 4=RadiatorBypass, 5=Parallel"
 #define HEAT_TRNSFR_MODE   "0=Passive, 1=DominantHeating, 2=DominantCooling"
 #define BEST_SINK          "0=Ambient, 1=Battery"
 #define BEST_SOURCE        "0=Ambient, 1=Battery, 2=Recirculation"
 #define THERMAL_DEMANDS    "0=None, 1=CoolCabin, 2=CoolBattery, 4=CoolPowertrain, 8=HeatCabinL, 16=HeatCabinR, 32=HeatBattery, 64=RadiatorDefrost"
-#define NTC                "0=JCurve, 1=KTY81-110, 2=KTY83-110, 3=KTY84-130, 4=Tesla_100K, 5=Tesla_10K, 6=PT1000"
 #define OPEN_CLOSE         "0=Open, 1=Closed"
 #define COOLANT_LEVEL      "0=Empty, 1=Minimum, 2=Nominal, 3=Max"
-#define CANIO              "0=HW-IO, 1=CAN-IO"
-#define HWIO_SRC           "0=Ext1, 1=Ext2, 2=Ext3, 3=Ext4"
 #define ONOFF              "0=Off, 1=On, 2=na"
+#define BOOL               "0=False, 1=True"
+#define CANEMU             "0=Auto, 1=AlwaysOn, 2=AlwaysOff"
+#define CMP_STATE          "0=Init, 1=Running, 2=Standby, 3=Fault, 4=Idle, 15=SNA"
+#define EMU_ACTIVE         "0=None, 1=LVPowerState, 2=okToUseHighPower, 4=Sensors, 8=VehicleStatus, 16=Mux10Hz"
 #define CAT_TEST           "Testing"
 #define CAT_COMM           "Communication"
 #define CAT_CTRL           "Interface"
@@ -161,12 +169,6 @@ enum _modes
    MOD_RUN = 1,
    MOD_CHARGE = 2,
    MOD_FASTCHARGE = 3
-};
-
-enum _canio
-{
-   HW_IO = 0,
-   CAN_IO = 1
 };
 
 enum OctoPos

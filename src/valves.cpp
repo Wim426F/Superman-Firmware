@@ -18,6 +18,7 @@
  */
 
 #include "valves.h"
+#include "errormessage.h"
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/rtc.h>
 #include <algorithm>
@@ -187,13 +188,13 @@ void Valve::expansionCalibrateAll()
 
 void Valve::coolantCondensorOpen()
 {
-    DigIo::valve_lcc.Clear();
+    DigIo::valve_lcc.Set();
 	Param::SetInt(Param::valve_coolant_condensor, 0);
 }
 
 void Valve::coolantCondensorClose()
 {
-    DigIo::valve_lcc.Set();
+    DigIo::valve_lcc.Clear();
 	Param::SetInt(Param::valve_coolant_condensor, 1);
 }
 
@@ -317,7 +318,11 @@ void Valve::octoRunTask()
 					// Hit position 5 endstop, correct to 1000 pulses
 					octovalve_pulse_count = pos_centers[5];
 				}
-				// For middle positions (2,3,4), accept current position
+				else
+				{
+					// Stalled at a middle position
+					ErrorMessage::Post(ERR_OCTOVALVE_FAULT);
+				}
 
 				// Clear target to stop trying
 				octo_target_position = 0;

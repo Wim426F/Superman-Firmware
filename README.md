@@ -15,41 +15,17 @@ The controller plugs directly into the existing wiring harness of the supermanif
 
 ### Controller features:
 - Digital inputs
-  - Heat battery
-  - Cool battery
   - Heat cabin left
   - Heat cabin right
   - Cool cabin
-  - Enable compressor input
-  - Key-on / Wakeup
+  - Preheat cabin/battery
 - Analog inputs
-  - 4x temperature sensors for cabin/motor/battery etc.
-- ESP32 with webserver onboard for configuration and diagnostics
-- CAN-bus for complete control and diagnostics
+  - 4x temperature sensors for motor/battery/radiator/ambient
+- CAN-bus
 - PWM outputs
   - 12V pwm for radiator fan
-  - 5V pwm for radiator shutter servo
- 
+  - 12V pwm for optional external waterpump
 
-# OTA (over the air upgrade)
-The firmware is linked to leave the 4 kb of flash unused. Those 4 kb are reserved for the bootloader
-that you can find here: https://github.com/jsphuebner/tumanako-inverter-fw-bootloader
-When flashing your device for the first time you must first flash that bootloader. After that you can
-use the ESP8266 module and its web interface to upload your actual application firmware.
-The web interface is here: https://github.com/jsphuebner/esp8266-web-interface
+For more info head to the wiki: [Superman Wiki](https://github.com/Wim426F/Superman-Firmware/wiki)
 
-# Compiling
-You will need the arm-none-eabi toolchain: https://developer.arm.com/open-source/gnu-toolchain/gnu-rm/downloads
-On Ubuntu type
-
-`sudo apt-get install git gcc-arm-none-eabi`
-
-The only external depedencies are libopencm3 and libopeninv. You can download and build these dependencies by typing
-
-`make get-deps`
-
-Now you can compile stm32-<yourname> by typing
-
-`make`
-
-And upload it to your board using a JTAG/SWD adapter, the updater.py script or the esp8266 web interface.
+Buy: [Webshop](https://www.wimboone.com/shop/p/tesla-superman-heat-pump-controller)
