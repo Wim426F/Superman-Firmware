@@ -31,6 +31,13 @@
 #define PWM_FAN_ARR     65535U  // Max res for granular duty (72 MHz / (11 * 65536) ≈ 100 Hz)
 #define PWM_FAN_PSC     10U     // Divides to ~6.55 MHz effective clock for ~100 Hz
 
+// Waterpump (TIM2 CH3 PB10, 100 Hz). Shares TIM2 with the radiator fan so the
+// period/prescaler match the fan's timing - a single timer has one ARR/PSC.
+#define PWM_PUMP_TIM   TIM2
+#define PWM_PUMP_OC    TIM_OC3  // PB10 = TIM2_CH3 (part of TIM2 partial remap 2)
+#define PWM_PUMP_ARR   65535U
+#define PWM_PUMP_PSC   10U
+
 // Pumps (TIM4 CH1/2 PB6/7, 10 Hz - allows 12-135Hz input capture without overflow)
 #define PWM_PUMP_BATT_TIM   TIM4
 #define PWM_PUMP_BATT_OC    TIM_OC1  // PB6
