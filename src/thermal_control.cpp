@@ -83,12 +83,12 @@ ThermalDemands assessDemands() {
     demands.cabinRHeating = Param::GetBool(Param::heat_cabinr);
     demands.cabinCooling = Param::GetBool(Param::cool_cabin);
 
-    // Battery and powertrain demands are automatic
-    int batteryTemp = Param::GetInt(Param::temp_battery);
+    // Battery and powertrain demands from return-line (outlet) coolant temp
+    int batteryTemp = Param::GetInt(Param::temp_outlet_battery);
     demands.batteryHeating = batteryTemp < Param::GetInt(Param::temp_battery_min);
     demands.batteryCooling = batteryTemp > Param::GetInt(Param::temp_battery_max);
 
-    int powertrainTemp = Param::GetInt(Param::temp_powertrain);
+    int powertrainTemp = Param::GetInt(Param::temp_outlet_powertrain);
     demands.powertrainCooling = powertrainTemp > Param::GetInt(Param::temp_powertrain_max);
 
     // If radiator coolant returns much cooler coolant than ambient it might we choking (freezing itself in) TODO
@@ -157,7 +157,7 @@ static void adjustCondenserSplit(uint8_t& cabinL, uint8_t& cabinR, uint8_t& cool
     // Reduce coolant condensor valve if cabin needs priority
     if (compressorDuty > 90 && (Param::GetInt(Param::temp_condensor_setp) - Param::GetInt(Param::temp_outlet_compressor) > 2.0f)) {
         coolant = std::max(static_cast<uint8_t>(coolant - 5), static_cast<uint8_t>(128)); // Reduce by 10%, min 50%
-    } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_battery_min) - Param::GetInt(Param::temp_battery) > 2.0f)) {
+    } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_battery_min) - Param::GetInt(Param::temp_outlet_battery) > 2.0f)) {
         coolant = std::min(static_cast<uint8_t>(coolant + 5), static_cast<uint8_t>(255)); // Increase by 10%, max 100%
     }
 }
@@ -166,7 +166,7 @@ static void adjustCondenserSplit(uint8_t& cabinL, uint8_t& cabinR, uint8_t& cool
 static void adjustEvaporatorSplit(uint8_t& cabin, uint8_t& coolant, uint8_t compressorDuty) {
     if (compressorDuty > 90 && (Param::GetInt(Param::temp_inlet_compressor) - Param::GetInt(Param::temp_evaporator_setp) > 2.0f)) {
         coolant = std::max(static_cast<uint8_t>(coolant - 5), static_cast<uint8_t>(0)); // Close coolant more, divert flow to cabin, -10%
-    } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_battery) - Param::GetInt(Param::temp_battery_max) > 2.0f)) {
+    } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_outlet_battery) - Param::GetInt(Param::temp_battery_max) > 2.0f)) {
         coolant = std::min(static_cast<uint8_t>(coolant + 5), static_cast<uint8_t>(255)); // Open coolant more if battery needs it
     }
 }
@@ -174,7 +174,7 @@ static void adjustEvaporatorSplit(uint8_t& cabin, uint8_t& coolant, uint8_t comp
 // Gather available heat sources and sinks
 void getAvailableSourcesSinks(const ThermalDemands& demands, SourceData sources[3], SinkData sinks[2]) {
     float ambientTemp = Param::GetInt(Param::temp_ambient);
-    float batteryTemp = Param::GetInt(Param::temp_battery);
+    float batteryTemp = Param::GetInt(Param::temp_outlet_battery);
     float recircTemp = Param::GetInt(Param::temp_outlet_compressor); //FIXME not correct!
 
     // Sources – always available when physically present

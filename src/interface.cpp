@@ -24,6 +24,8 @@
 
 
 uint32_t Interface::last6E0Rx = 0;
+bool Interface::canBatteryTemp = false;
+bool Interface::canPowertrainTemp = false;
 
 void Interface::handle6E0(uint32_t data[2])  // Cabin heat/cool/preheat requests (substitutes digio)
 {
@@ -38,11 +40,13 @@ void Interface::handle6E0(uint32_t data[2])  // Cabin heat/cool/preheat requests
 
     // Optional direct sensor values, offset 40. 0x00 and 0xFF mean not sent,
     // so a sender may use DLC 4 or pad the unused bytes with 0xFF.
-    if(bytes[4] != 0x00 && bytes[4] != 0xFF)
-        Param::SetFloat(Param::temp_battery, (float)bytes[4] - 40);
+    canBatteryTemp = (bytes[4] != 0x00 && bytes[4] != 0xFF);
+    if (canBatteryTemp)
+        Param::SetFloat(Param::temp_outlet_battery, (float)bytes[4] - 40);
 
-    if(bytes[5] != 0x00 && bytes[5] != 0xFF)
-        Param::SetFloat(Param::temp_powertrain, (float)bytes[5] - 40);
+    canPowertrainTemp = (bytes[5] != 0x00 && bytes[5] != 0xFF);
+    if (canPowertrainTemp)
+        Param::SetFloat(Param::temp_outlet_powertrain, (float)bytes[5] - 40);
 }
 
 

@@ -200,17 +200,15 @@ void tim_setup()
    timer_enable_oc_preload(TIM2, PWM_FAN_OC);
    timer_set_oc_polarity_high(TIM2, PWM_FAN_OC);
    timer_enable_oc_output(TIM2, PWM_FAN_OC);
-    timer_set_oc_value(TIM2, PWM_FAN_OC, 0);  // 0% init (fan off)
+   timer_set_oc_value(TIM2, PWM_FAN_OC, 0);  // 0% init (fan off)
+   // Waterpump on PB10 = TIM2 CH3 (partial remap 2). Inherits the timer period/prescaler already configured for the fan above.
+   gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO10);
+   timer_set_oc_mode(TIM2, PWM_PUMP_OC, TIM_OCM_PWM1);
+   timer_enable_oc_preload(TIM2, PWM_PUMP_OC);
+   timer_set_oc_polarity_high(TIM2, PWM_PUMP_OC);
+   timer_enable_oc_output(TIM2, PWM_PUMP_OC);
+   timer_set_oc_value(TIM2, PWM_PUMP_OC, 0);  // 0% init (pump off)
 
-    // Waterpump on PB10 = TIM2 CH3 (partial remap 2). Inherits the timer period/prescaler already configured for the fan above.
-    gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO10);
-    timer_set_oc_mode(TIM2, PWM_PUMP_OC, TIM_OCM_PWM1);
-    timer_enable_oc_preload(TIM2, PWM_PUMP_OC);
-    timer_set_oc_polarity_high(TIM2, PWM_PUMP_OC);
-    timer_enable_oc_output(TIM2, PWM_PUMP_OC);
-    timer_set_oc_value(TIM2, PWM_PUMP_OC, 0);  // 0% init (pump off)
-
-   
    timer_enable_counter(TIM2);
 
 

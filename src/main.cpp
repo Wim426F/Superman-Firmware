@@ -85,6 +85,8 @@ static void Ms10Task(void)
       Param::SetInt(Param::heat_cabinr, DigIo::cabin_heatr.Get());
       Param::SetInt(Param::cool_cabin, DigIo::cabin_cool.Get());
       Param::SetInt(Param::preheat_req, DigIo::preheat_req.Get());
+      Interface::canBatteryTemp = false;
+      Interface::canPowertrainTemp = false;
    }
 
    // Set pump RPM feedback (repurposing flow parameters for RPM)
