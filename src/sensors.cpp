@@ -46,9 +46,9 @@ static inline bool pinned(float raw, float lo, float hi) { return raw <= lo || r
 #define RESERVOIR_UF_CAL       0.82f
 
 // reservoir levels
-#define RESERVOIR_UF_MAX      24.0f    // >= this -> COOLANT_MAX       marker at 24
-#define RESERVOIR_UF_NOMINAL  21.0f    // >= this -> COOLANT_NOMINAL   marker at 22
-#define RESERVOIR_UF_MINIMUM  10.0f    // >= this -> COOLANT_MINIMUM   marker at 15
+#define RESERVOIR_UF_MAX      28.5f    // >= this -> COOLANT_MAX       marker at 28.5
+#define RESERVOIR_UF_NOMINAL  22.0f    // >= this -> COOLANT_NOMINAL   marker at 24
+#define RESERVOIR_UF_MINIMUM  11.5f    // >= this -> COOLANT_MINIMUM   marker at 11.5
                                        // else       COOLANT_EMPTY
 
 Ewma ps1_filter(0.5);

@@ -305,9 +305,9 @@ void thermalControl() {
     SinkType bestSink = selectBestSink(evap_setpoint, sinks);
 
     /* Water pump control */
-    // Tie waterpump speeds to compressor with minimum and maximum of 20-80% waterpump duty.
+    // Tie waterpump speeds to compressor with minimum and maximum of 20-100% waterpump duty.
     bool reservoirFull = Param::GetInt(Param::reservoir_level) != 0;
-    int requestedDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 20, 80);
+    int requestedDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 20, 100);
     int pumpDuty = reservoirFull ? requestedDuty : 0; // If reservoir is empty, refuse to run pumps.
     Waterpump::powertrainSetDuty(static_cast<uint8_t>(pumpDuty));
     Waterpump::batterySetDuty(static_cast<uint8_t>(pumpDuty));
