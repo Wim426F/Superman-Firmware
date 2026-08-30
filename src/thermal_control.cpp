@@ -312,6 +312,13 @@ void thermalControl() {
     Waterpump::powertrainSetDuty(static_cast<uint8_t>(pumpDuty));
     Waterpump::batterySetDuty(static_cast<uint8_t>(pumpDuty));
     
+    /* External waterpump control */
+    // This is only for option of cabin coolant condensor
+    if (demands.cabinLHeating || demands.cabinRHeating)
+        // only spin pump when cabin heat required. Tie duty to  
+        pwm_write(100, PWM_PUMP_TIM, PWM_PUMP_OC, PWM_PUMP_ARR);
+    else
+        pwm_write(0, PWM_PUMP_TIM, PWM_PUMP_OC, PWM_PUMP_ARR);
 
     /* Radiatorfan control */
     // only spin radiator if heat must be rejected or absorbed from ambient
