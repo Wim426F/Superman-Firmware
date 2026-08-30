@@ -30,7 +30,7 @@ const float POWERTRAIN_COOL_THRESHOLD = 50.0f;  // °C
 const float HIGH_PRESSURE_LIMIT = 30.0f;  // Bar
 const float LOW_PRESSURE_LIMIT = 1.0f;    // Bar
 const float MIN_VALVE_POSITION = 5.0f; // %
-const float RECIRC_TEMP_THRESHOLD = -20.0f;  // °C for recirculation mode
+const float RECIRC_TEMP_THRESHOLD = -20.0f;  // recirc is heatsource below this temp
 
 // PI control constants
 const float Kp = 1.0f;
@@ -175,7 +175,7 @@ static void adjustEvaporatorSplit(uint8_t& cabin, uint8_t& coolant, uint8_t comp
 void getAvailableSourcesSinks(const ThermalDemands& demands, SourceData sources[3], SinkData sinks[2]) {
     float ambientTemp = Param::GetInt(Param::temp_ambient);
     float batteryTemp = Param::GetInt(Param::temp_outlet_battery);
-    float recircTemp = Param::GetInt(Param::temp_outlet_compressor); //FIXME not correct!
+    const float recircTemp = RECIRC_TEMP_THRESHOLD; // Ranking trick to force self-heat mode under treshold.
 
     // Sources – always available when physically present
     sources[0] = {SourceType::BATTERY, {!demands.batteryHeating, batteryTemp}}; // Can't source heat from battery if it needs heating
@@ -202,10 +202,6 @@ SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
             }
         }
     }
-
-    // Use recirculation if ambient too cold and other sources insufficient
-    if (Param::GetInt(Param::temp_ambient) < RECIRC_TEMP_THRESHOLD)
-        bestSource = SourceType::RECIRCULATION;
 
     Param::SetInt(Param::best_source, (int)bestSource);
     return bestSource;
