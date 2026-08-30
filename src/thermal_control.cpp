@@ -29,8 +29,9 @@ const float BATTERY_COOL_THRESHOLD = 40.0f;  // °C
 const float POWERTRAIN_COOL_THRESHOLD = 50.0f;  // °C
 const float HIGH_PRESSURE_LIMIT = 30.0f;  // Bar
 const float LOW_PRESSURE_LIMIT = 1.0f;    // Bar
-const float MIN_VALVE_POSITION = 5.0f; // %
+const float MIN_VALVE_POSITION = 5.0f;
 const float RECIRC_TEMP_THRESHOLD = -20.0f;  // recirc is heatsource below this temp
+const float RANK_HYSTERYSIS = 5.0f;            // °C; hysterysis on source/sink selection to avoid octovalve constant changing
 
 // PI control constants
 const float Kp = 1.0f;
@@ -191,11 +192,13 @@ void getAvailableSourcesSinks(const ThermalDemands& demands, SourceData sources[
 SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
     SourceType bestSource = SourceType::AMBIENT;
     float minDeltaT = std::numeric_limits<float>::max(); // Start with highest float to ensure first delta updates min
+    static SourceType lastSource = (SourceType)-1; // init with no source to avoid hysterysis on startup
 
     // Check each source for smallest temp difference (hottest source)
     for (int i = 0; i < 3; i++) {
         if (sources[i].info.available) {
             float deltaT = targetTemp - sources[i].info.temp; // Calc delta to rank sources
+            if (sources[i].type == lastSource) deltaT -= RANK_HYSTERYSIS; // keep last source unless difference > hysterysis
             if (deltaT < minDeltaT) {
                 minDeltaT = deltaT;
                 bestSource = sources[i].type; // Update if hotter source found
@@ -203,6 +206,7 @@ SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
         }
     }
 
+    lastSource = bestSource;
     Param::SetInt(Param::best_source, (int)bestSource);
     return bestSource;
 }
@@ -211,17 +215,20 @@ SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
 SinkType selectBestSink(float targetTemp, const SinkData sinks[2]) {
     SinkType bestSink = SinkType::AMBIENT;
     float maxDeltaT = -std::numeric_limits<float>::max(); // Start with lowest float to ensure first delta updates max
+    static SinkType lastSink = (SinkType)-1; // init with no sink to avoid hysterysis on startup
 
     // Check each sink for largest temp difference (best heat rejection)
     for (int i = 0; i < 2; i++) {
         if (sinks[i].info.available) {
             float deltaT = targetTemp - sinks[i].info.temp; // Calc delta to rank sinks
+            if (sinks[i].type == lastSink) deltaT += RANK_HYSTERYSIS; // keep last sink unless difference > hysterysis
             if (deltaT > maxDeltaT) {
                 maxDeltaT = deltaT;
                 bestSink = sinks[i].type; // Update if better sink found
             }
         }
     }
+    lastSink = bestSink;
     Param::SetInt(Param::best_sink, (int)bestSink);
     return bestSink;
 }
