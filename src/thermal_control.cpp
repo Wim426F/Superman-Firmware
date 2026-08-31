@@ -86,11 +86,22 @@ ThermalDemands assessDemands() {
 
     // Battery and powertrain demands from return-line (outlet) coolant temp
     int batteryTemp = Param::GetInt(Param::temp_outlet_battery);
-    demands.batteryHeating = batteryTemp < Param::GetInt(Param::temp_battery_min);
-    demands.batteryCooling = batteryTemp > Param::GetInt(Param::temp_battery_max);
+    static bool bBatHeatLatch = false;
+    static bool bBatCoolLatch = false;
+    static bool bPtCoolLatch = false;
+
+    if (batteryTemp < Param::GetInt(Param::temp_battery_min)) bBatHeatLatch = true;
+    else if (batteryTemp > Param::GetInt(Param::temp_battery_min) + RANK_HYSTERYSIS) bBatHeatLatch = false;
+    demands.batteryHeating = bBatHeatLatch;
+
+    if (batteryTemp > Param::GetInt(Param::temp_battery_max)) bBatCoolLatch = true;
+    else if (batteryTemp < Param::GetInt(Param::temp_battery_max) - RANK_HYSTERYSIS) bBatCoolLatch = false;
+    demands.batteryCooling = bBatCoolLatch;
 
     int powertrainTemp = Param::GetInt(Param::temp_outlet_powertrain);
-    demands.powertrainCooling = powertrainTemp > Param::GetInt(Param::temp_powertrain_max);
+    if (powertrainTemp > Param::GetInt(Param::temp_powertrain_max)) bPtCoolLatch = true;
+    else if (powertrainTemp < Param::GetInt(Param::temp_powertrain_max) - RANK_HYSTERYSIS) bPtCoolLatch = false;
+    demands.powertrainCooling = bPtCoolLatch;
 
     // If radiator coolant returns much cooler coolant than ambient it might we choking (freezing itself in) TODO
     //demands.radiatorDefrost = (heating && Param::GetInt(Param::temp_radiator) < Param::GetInt(Param::temp_ambient) -5 && Compressor::GetDuty() > 80);
