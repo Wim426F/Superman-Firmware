@@ -94,12 +94,12 @@
    VALUE_ENTRY(temp_inlet_compressor,       "°C",      2017 ) \
    VALUE_ENTRY(temp_outlet_compressor,      "°C",      2018 ) \
    VALUE_ENTRY(temp_pre_evaporator,         "°C",      2019 ) \
-   VALUE_ENTRY(temp_inlet_battery,          "°C",      2020 ) \
-   VALUE_ENTRY(temp_inlet_powertrain,       "°C",      2021 ) \
+   VALUE_ENTRY(temp_outlet_battery,         "°C",      2020 ) \
+   VALUE_ENTRY(temp_outlet_powertrain,      "°C",      2021 ) \
    VALUE_ENTRY(temp_ambient,                "°C",      2022 ) \
-   VALUE_ENTRY(temp_radiator,               "°C",      2023 ) \
-   VALUE_ENTRY(temp_battery,                "°C",      2024 ) \
-   VALUE_ENTRY(temp_powertrain,             "°C",      2025 ) \
+   /* VALUE_ENTRY(temp_radiator,               "°C",      2023 ) */ \
+   /* VALUE_ENTRY(temp_battery,                "°C",      2024 ) */ \
+   /* VALUE_ENTRY(temp_powertrain,             "°C",      2025 ) */ \
    VALUE_ENTRY(reservoir_level,            COOLANT_LEVEL,2026 ) \
    VALUE_ENTRY(reservoir_cap,               "uF",      2049 ) \
    VALUE_ENTRY(cool_cabin,                  ONOFF,     2029 ) \

@@ -1,5 +1,6 @@
 #include "sensors.h"
 #include "errormessage.h"
+#include "interface.h"
 #include "math.h"
 #include "Ewma.h"
 #include <libopencm3/stm32/gpio.h>
@@ -45,9 +46,9 @@ static inline bool pinned(float raw, float lo, float hi) { return raw <= lo || r
 #define RESERVOIR_UF_CAL       0.82f
 
 // reservoir levels
-#define RESERVOIR_UF_MAX      24.0f    // >= this -> COOLANT_MAX       marker at 24
-#define RESERVOIR_UF_NOMINAL  21.0f    // >= this -> COOLANT_NOMINAL   marker at 22
-#define RESERVOIR_UF_MINIMUM  10.0f    // >= this -> COOLANT_MINIMUM   marker at 15
+#define RESERVOIR_UF_MAX      28.5f    // >= this -> COOLANT_MAX       marker at 28.5
+#define RESERVOIR_UF_NOMINAL  22.0f    // >= this -> COOLANT_NOMINAL   marker at 24
+#define RESERVOIR_UF_MINIMUM  11.5f    // >= this -> COOLANT_MINIMUM   marker at 11.5
                                        // else       COOLANT_EMPTY
 
 Ewma ps1_filter(0.5);
@@ -58,8 +59,8 @@ Ewma ps1t_filter(0.5);
 Ewma ps2t_filter(0.5);
 Ewma ps3t_filter(0.5);
 
-Ewma battin_filter(0.5);
-Ewma ptinfilter   (0.5);
+Ewma battout_filter(0.5);
+Ewma ptout_filter (0.5);
 Ewma reserv_filter(0.3);
 
 Ewma ntc1_filter(0.5);
@@ -67,12 +68,12 @@ Ewma ntc2_filter(0.5);
 Ewma ntc3_filter(0.5);
 Ewma ntc4_filter(0.5);
 
-Ewma radiator_filter(0.5);
+/* Ewma radiator_filter(0.5); */
 Ewma ambient_filter(0.5);
 Ewma cabin_left_filter(0.5);
 Ewma cabin_right_filter(0.5);
-Ewma battery_filter(0.5);
-Ewma powertrain_filter(0.5);
+/* Ewma battery_filter(0.5); */
+/* Ewma powertrain_filter(0.5); */
 
 float HIGHPRESSURE_SENSOR = 37.265; // rated pressure for high side pressure sensor
 float LOWPRESSURE_SENSOR = 10.859;  // rated pressure for low side pressure sensor
@@ -86,8 +87,8 @@ float temp_ntc2_offset = 0;
 float temp_ntc3_offset = 0;
 float temp_ntc4_offset = 0;
 
-float temp_battin_offset = 0;
-float temp_ptin_offset = 0;
+float temp_battout_offset = 0;
+float temp_ptout_offset = 0;
 float temp_reserv_offset = 0;
 
 
@@ -200,30 +201,33 @@ void GetSensorReadings()
     float t1 = TempMeas::Lookup(AnaIn::temp_inlet_compressor.Get(),  TempMeas::TEMP_TESLA_10K);
     float t2 = TempMeas::Lookup(AnaIn::temp_outlet_compressor.Get(), TempMeas::TEMP_TESLA_10K);
     float t3 = TempMeas::Lookup(AnaIn::temp_pre_evaporator.Get(),    TempMeas::TEMP_TESLA_10K);
-    float t4 = TempMeas::Lookup(AnaIn::temp_inlet_battery.Get(),     TempMeas::TEMP_GE1935);
-    float t5 = TempMeas::Lookup(AnaIn::temp_inlet_powertrain.Get(),  TempMeas::TEMP_GE1935);
-    float t6 = TempMeas::Lookup(AnaIn::temp_radiator.Get(),          TempMeas::TEMP_GE1935);
+    float t4 = TempMeas::Lookup(AnaIn::temp_outlet_battery.Get(),    TempMeas::TEMP_GE1935);
+    float t5 = TempMeas::Lookup(AnaIn::temp_outlet_powertrain.Get(), TempMeas::TEMP_GE1935);
+    /* float t6 = TempMeas::Lookup(AnaIn::temp_radiator.Get(),          TempMeas::TEMP_GE1935); */
     float t7 = TempMeas::Lookup(AnaIn::temp_ambient.Get(),           TempMeas::TEMP_GE1935);
-    float t8 = TempMeas::Lookup(AnaIn::temp_battery.Get(),           TempMeas::TEMP_GE1935);
-    float t9 = TempMeas::Lookup(AnaIn::temp_powertrain.Get(),        TempMeas::TEMP_GE1935);
+    /* float t8 = TempMeas::Lookup(AnaIn::temp_battery.Get(),           TempMeas::TEMP_GE1935); */
+    /* float t9 = TempMeas::Lookup(AnaIn::temp_powertrain.Get(),        TempMeas::TEMP_GE1935); */
 
     Param::SetFloat(Param::temp_inlet_compressor,   ps1t_filter.filter(t1) - temp_ps1_offset);
     Param::SetFloat(Param::temp_outlet_compressor,  ps2t_filter.filter(t2) - temp_ps2_offset);
     Param::SetFloat(Param::temp_pre_evaporator,     ps3t_filter.filter(t3) - temp_ps3_offset);
 
-    Param::SetFloat(Param::temp_inlet_battery,      battin_filter.filter(t4) - temp_battin_offset);
-    Param::SetFloat(Param::temp_inlet_powertrain,   ptinfilter.filter(t5)   - temp_ptin_offset);
+    if (!Interface::canBatteryTemp)
+        Param::SetFloat(Param::temp_outlet_battery,    battout_filter.filter(t4) - temp_battout_offset);
+    if (!Interface::canPowertrainTemp)
+        Param::SetFloat(Param::temp_outlet_powertrain, ptout_filter.filter(t5)  - temp_ptout_offset);
 
-    Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(t6));
+    /* Param::SetFloat(Param::temp_radiator,       radiator_filter.filter(t6)); */
     Param::SetFloat(Param::temp_ambient,        ambient_filter.filter(t7));
-    Param::SetFloat(Param::temp_battery,        battery_filter.filter(t8));
-    Param::SetFloat(Param::temp_powertrain,     powertrain_filter.filter(t9));
+    /* Param::SetFloat(Param::temp_battery,        battery_filter.filter(t8)); */
+    /* Param::SetFloat(Param::temp_powertrain,     powertrain_filter.filter(t9)); */
 
     // Check if sensor reads at rail voltage, in that case throw error.
     bool pressurePinned = pinned(pps1raw, 5, 4090) || pinned(pps2raw, 5, 4090) || pinned(pps3raw, 5, 4090);
     bool tempPinned = pinned(t1, -30, 110) || pinned(t2, -30, 110) || pinned(t3, -30, 110) // TESLA_10K
-                    || pinned(t4, -40, 120) || pinned(t5, -40, 120) || pinned(t6, -40, 120)
-                    || pinned(t7, -40, 120) || pinned(t8, -40, 120) || pinned(t9, -40, 120); // GE1935
+                    || pinned(t4, -40, 120) || pinned(t5, -40, 120) // GE1935 battery/PT outlet
+                    || pinned(t7, -40, 120); // GE1935 ambient
+                    /* || pinned(t6, -40, 120) || pinned(t8, -40, 120) || pinned(t9, -40, 120); */
 
     static uint16_t pressurePinCount = 0;
     static uint16_t tempPinCount = 0;

@@ -367,14 +367,14 @@ int Compressor::GetDuty()
 void Waterpump::batterySetDuty(uint8_t duty) // in %
 {
     Param::SetInt(Param::pump_battery_duty, duty);
-    duty = utils::limitVal(duty, 0, 80); // driver doesnt seem to work above 80%
+    duty = utils::limitVal(duty, 0, 100);
     pwm_write(duty, PWM_PUMP_BATT_TIM, PWM_PUMP_BATT_OC, PWM_PUMP_BATT_ARR);
 }
 
 void Waterpump::powertrainSetDuty(uint8_t duty) // in %
 {
     Param::SetInt(Param::pump_powertrain_duty, duty);
-    duty = utils::limitVal(duty, 0, 80); // driver doesnt seem to work above 80%
+    duty = utils::limitVal(duty, 0, 100);
     pwm_write(duty, PWM_PUMP_PT_TIM, PWM_PUMP_PT_OC, PWM_PUMP_PT_ARR);
 }
 

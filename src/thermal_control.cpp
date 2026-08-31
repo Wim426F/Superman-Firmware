@@ -29,8 +29,9 @@ const float BATTERY_COOL_THRESHOLD = 40.0f;  // °C
 const float POWERTRAIN_COOL_THRESHOLD = 50.0f;  // °C
 const float HIGH_PRESSURE_LIMIT = 30.0f;  // Bar
 const float LOW_PRESSURE_LIMIT = 1.0f;    // Bar
-const float MIN_VALVE_POSITION = 5.0f; // %
-const float RECIRC_TEMP_THRESHOLD = -20.0f;  // °C for recirculation mode
+const float MIN_VALVE_POSITION = 5.0f;
+const float RECIRC_TEMP_THRESHOLD = -20.0f;  // recirc is heatsource below this temp
+const float RANK_HYSTERYSIS = 5.0f;            // °C; hysterysis on source/sink selection to avoid octovalve constant changing
 
 // PI control constants
 const float Kp = 1.0f;
@@ -83,12 +84,12 @@ ThermalDemands assessDemands() {
     demands.cabinRHeating = Param::GetBool(Param::heat_cabinr);
     demands.cabinCooling = Param::GetBool(Param::cool_cabin);
 
-    // Battery and powertrain demands are automatic
-    int batteryTemp = Param::GetInt(Param::temp_battery);
+    // Battery and powertrain demands from return-line (outlet) coolant temp
+    int batteryTemp = Param::GetInt(Param::temp_outlet_battery);
     demands.batteryHeating = batteryTemp < Param::GetInt(Param::temp_battery_min);
     demands.batteryCooling = batteryTemp > Param::GetInt(Param::temp_battery_max);
 
-    int powertrainTemp = Param::GetInt(Param::temp_powertrain);
+    int powertrainTemp = Param::GetInt(Param::temp_outlet_powertrain);
     demands.powertrainCooling = powertrainTemp > Param::GetInt(Param::temp_powertrain_max);
 
     // If radiator coolant returns much cooler coolant than ambient it might we choking (freezing itself in) TODO
@@ -157,7 +158,7 @@ static void adjustCondenserSplit(uint8_t& cabinL, uint8_t& cabinR, uint8_t& cool
     // Reduce coolant condensor valve if cabin needs priority
     if (compressorDuty > 90 && (Param::GetInt(Param::temp_condensor_setp) - Param::GetInt(Param::temp_outlet_compressor) > 2.0f)) {
         coolant = std::max(static_cast<uint8_t>(coolant - 5), static_cast<uint8_t>(128)); // Reduce by 10%, min 50%
-    } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_battery_min) - Param::GetInt(Param::temp_battery) > 2.0f)) {
+    } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_battery_min) - Param::GetInt(Param::temp_outlet_battery) > 2.0f)) {
         coolant = std::min(static_cast<uint8_t>(coolant + 5), static_cast<uint8_t>(255)); // Increase by 10%, max 100%
     }
 }
@@ -166,7 +167,7 @@ static void adjustCondenserSplit(uint8_t& cabinL, uint8_t& cabinR, uint8_t& cool
 static void adjustEvaporatorSplit(uint8_t& cabin, uint8_t& coolant, uint8_t compressorDuty) {
     if (compressorDuty > 90 && (Param::GetInt(Param::temp_inlet_compressor) - Param::GetInt(Param::temp_evaporator_setp) > 2.0f)) {
         coolant = std::max(static_cast<uint8_t>(coolant - 5), static_cast<uint8_t>(0)); // Close coolant more, divert flow to cabin, -10%
-    } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_battery) - Param::GetInt(Param::temp_battery_max) > 2.0f)) {
+    } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_outlet_battery) - Param::GetInt(Param::temp_battery_max) > 2.0f)) {
         coolant = std::min(static_cast<uint8_t>(coolant + 5), static_cast<uint8_t>(255)); // Open coolant more if battery needs it
     }
 }
@@ -174,8 +175,8 @@ static void adjustEvaporatorSplit(uint8_t& cabin, uint8_t& coolant, uint8_t comp
 // Gather available heat sources and sinks
 void getAvailableSourcesSinks(const ThermalDemands& demands, SourceData sources[3], SinkData sinks[2]) {
     float ambientTemp = Param::GetInt(Param::temp_ambient);
-    float batteryTemp = Param::GetInt(Param::temp_battery);
-    float recircTemp = Param::GetInt(Param::temp_outlet_compressor); //FIXME not correct!
+    float batteryTemp = Param::GetInt(Param::temp_outlet_battery);
+    const float recircTemp = RECIRC_TEMP_THRESHOLD; // Ranking trick to force self-heat mode under treshold.
 
     // Sources – always available when physically present
     sources[0] = {SourceType::BATTERY, {!demands.batteryHeating, batteryTemp}}; // Can't source heat from battery if it needs heating
@@ -191,11 +192,13 @@ void getAvailableSourcesSinks(const ThermalDemands& demands, SourceData sources[
 SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
     SourceType bestSource = SourceType::AMBIENT;
     float minDeltaT = std::numeric_limits<float>::max(); // Start with highest float to ensure first delta updates min
+    static SourceType lastSource = (SourceType)-1; // init with no source to avoid hysterysis on startup
 
     // Check each source for smallest temp difference (hottest source)
     for (int i = 0; i < 3; i++) {
         if (sources[i].info.available) {
             float deltaT = targetTemp - sources[i].info.temp; // Calc delta to rank sources
+            if (sources[i].type == lastSource) deltaT -= RANK_HYSTERYSIS; // keep last source unless difference > hysterysis
             if (deltaT < minDeltaT) {
                 minDeltaT = deltaT;
                 bestSource = sources[i].type; // Update if hotter source found
@@ -203,10 +206,7 @@ SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
         }
     }
 
-    // Use recirculation if ambient too cold and other sources insufficient
-    if (Param::GetInt(Param::temp_ambient) < RECIRC_TEMP_THRESHOLD)
-        bestSource = SourceType::RECIRCULATION;
-
+    lastSource = bestSource;
     Param::SetInt(Param::best_source, (int)bestSource);
     return bestSource;
 }
@@ -215,17 +215,20 @@ SourceType selectBestSource(float targetTemp, const SourceData sources[3]) {
 SinkType selectBestSink(float targetTemp, const SinkData sinks[2]) {
     SinkType bestSink = SinkType::AMBIENT;
     float maxDeltaT = -std::numeric_limits<float>::max(); // Start with lowest float to ensure first delta updates max
+    static SinkType lastSink = (SinkType)-1; // init with no sink to avoid hysterysis on startup
 
     // Check each sink for largest temp difference (best heat rejection)
     for (int i = 0; i < 2; i++) {
         if (sinks[i].info.available) {
             float deltaT = targetTemp - sinks[i].info.temp; // Calc delta to rank sinks
+            if (sinks[i].type == lastSink) deltaT += RANK_HYSTERYSIS; // keep last sink unless difference > hysterysis
             if (deltaT > maxDeltaT) {
                 maxDeltaT = deltaT;
                 bestSink = sinks[i].type; // Update if better sink found
             }
         }
     }
+    lastSink = bestSink;
     Param::SetInt(Param::best_sink, (int)bestSink);
     return bestSink;
 }
@@ -302,13 +305,20 @@ void thermalControl() {
     SinkType bestSink = selectBestSink(evap_setpoint, sinks);
 
     /* Water pump control */
-    // Tie waterpump speeds to compressor with minimum and maximum of 20-80% waterpump duty.
+    // Tie waterpump speeds to compressor with minimum and maximum of 20-100% waterpump duty.
     bool reservoirFull = Param::GetInt(Param::reservoir_level) != 0;
-    int requestedDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 20, 80);
+    int requestedDuty = utils::limitVal(Param::GetInt(Param::compressor_duty_request), 20, 100);
     int pumpDuty = reservoirFull ? requestedDuty : 0; // If reservoir is empty, refuse to run pumps.
     Waterpump::powertrainSetDuty(static_cast<uint8_t>(pumpDuty));
     Waterpump::batterySetDuty(static_cast<uint8_t>(pumpDuty));
     
+    /* External waterpump control */
+    // This is only for option of cabin coolant condensor
+    if (demands.cabinLHeating || demands.cabinRHeating)
+        // only spin pump when cabin heat required. Tie duty to  
+        pwm_write(100, PWM_PUMP_TIM, PWM_PUMP_OC, PWM_PUMP_ARR);
+    else
+        pwm_write(0, PWM_PUMP_TIM, PWM_PUMP_OC, PWM_PUMP_ARR);
 
     /* Radiatorfan control */
     // only spin radiator if heat must be rejected or absorbed from ambient

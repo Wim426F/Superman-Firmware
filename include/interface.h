@@ -17,6 +17,8 @@ public:
     static void SendMessages(CanHardware* can);
 
     static uint32_t last6E0Rx;
+    static bool canBatteryTemp;     // 0x6E0 provided a battery temp (overrides analog)
+    static bool canPowertrainTemp;  // 0x6E0 provided a powertrain temp (overrides analog)
 
 };
 
