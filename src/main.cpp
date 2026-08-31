@@ -126,9 +126,12 @@ static void Ms100Task(void)
 
    GetSensorReadings();
 
-   // HARDWARE-TEST BUILD:  
-   testControl();
-   //thermalControl(); // The whole thermal management happens in here
+    // HARDWARE-TEST BUILD: switch between bench test mode and full thermal control based on the hw_test param.
+    if (Param::GetInt(Param::hw_test)) {
+        testControl();
+    } else {
+        thermalControl(); // The whole thermal management happens in here
+    }
 
    //If we chose to send CAN messages every 100 ms, do this here.
    canMap->SendAll();

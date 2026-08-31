@@ -60,6 +60,7 @@
    PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      6000,    6000,    10 ) \
    PARAM_ENTRY(CAT_COMM,    canemu,                CANEMU,       0,      2,       0,       11 ) \
    /* --- Hardware bring-up test mode (hardware-test build only). Defaults are safe (all off/closed). --- */ \
+   PARAM_ENTRY(CAT_TEST,    hw_test,               ONOFF,        0,      1,       0,       27 ) \
    PARAM_ENTRY(CAT_TEST,    test_expv_evap_coolant,"dig",        0,      255,     0,       24 ) \
    PARAM_ENTRY(CAT_TEST,    test_expv_evap_cabin,  "dig",        0,      255,     0,       12 ) \
    PARAM_ENTRY(CAT_TEST,    test_expv_evap_recirc, "dig",        0,      255,     0,       13 ) \
