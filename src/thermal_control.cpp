@@ -350,8 +350,8 @@ void thermalControl() {
 
 
     // Dominant cooling
-    if (    (demands.batteryCooling && demands.powertrainCooling)
-        ||  (demands.cabinCooling && bestSink == SinkType::AMBIENT) 
+    if (    (demands.powertrainCooling && !demands.batteryHeating)
+        ||  (demands.cabinCooling && bestSink == SinkType::AMBIENT)
         ||  ((demands.cabinLHeating || demands.cabinRHeating) && bestSource == SourceType::BATTERY)
        )
         Valve::octoSetPos(OctoPos::POS2_SERIES);   // Condensor -> Radiator -> Evaporator -> Battery -> Powertrain
