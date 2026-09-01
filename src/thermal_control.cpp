@@ -30,7 +30,7 @@ const float POWERTRAIN_COOL_THRESHOLD = 50.0f;  // °C
 const float HIGH_PRESSURE_LIMIT = 30.0f;  // Bar
 const float LOW_PRESSURE_LIMIT = 1.0f;    // Bar
 const float MIN_VALVE_POSITION = 5.0f;
-const float RECIRC_TEMP_THRESHOLD = -20.0f;  // recirc is heatsource below this temp
+const float SELFHEAT_TEMP_THRESHOLD = -20.0f;  // recirc is heatsource below this temp
 const float RANK_HYSTERYSIS = 5.0f;            // °C; hysterysis on source/sink selection to avoid octovalve constant changing
 
 // PI control constants
@@ -43,7 +43,7 @@ float last_error = 0;
 // Source and sink types
 // Cabin is never a source or sink, as control is from its perspective. It can only need a source or sink.
 // Powertrain would be nice as source but octovalve cannot but evaporator in front of powertrain. only evaporator->battery->powertrain.
-enum class SourceType {AMBIENT, BATTERY, RECIRCULATION};
+enum class SourceType {AMBIENT, BATTERY, SELFHEAT};
 enum class SinkType {AMBIENT, BATTERY};
 
 // Component struct
@@ -86,11 +86,22 @@ ThermalDemands assessDemands() {
 
     // Battery and powertrain demands from return-line (outlet) coolant temp
     int batteryTemp = Param::GetInt(Param::temp_outlet_battery);
-    demands.batteryHeating = batteryTemp < Param::GetInt(Param::temp_battery_min);
-    demands.batteryCooling = batteryTemp > Param::GetInt(Param::temp_battery_max);
+    static bool bBatHeatLatch = false;
+    static bool bBatCoolLatch = false;
+    static bool bPtCoolLatch = false;
+
+    if (batteryTemp < Param::GetInt(Param::temp_battery_min)) bBatHeatLatch = true;
+    else if (batteryTemp > Param::GetInt(Param::temp_battery_min) + RANK_HYSTERYSIS) bBatHeatLatch = false;
+    demands.batteryHeating = bBatHeatLatch;
+
+    if (batteryTemp > Param::GetInt(Param::temp_battery_max)) bBatCoolLatch = true;
+    else if (batteryTemp < Param::GetInt(Param::temp_battery_max) - RANK_HYSTERYSIS) bBatCoolLatch = false;
+    demands.batteryCooling = bBatCoolLatch;
 
     int powertrainTemp = Param::GetInt(Param::temp_outlet_powertrain);
-    demands.powertrainCooling = powertrainTemp > Param::GetInt(Param::temp_powertrain_max);
+    if (powertrainTemp > Param::GetInt(Param::temp_powertrain_max)) bPtCoolLatch = true;
+    else if (powertrainTemp < Param::GetInt(Param::temp_powertrain_max) - RANK_HYSTERYSIS) bPtCoolLatch = false;
+    demands.powertrainCooling = bPtCoolLatch;
 
     // If radiator coolant returns much cooler coolant than ambient it might we choking (freezing itself in) TODO
     //demands.radiatorDefrost = (heating && Param::GetInt(Param::temp_radiator) < Param::GetInt(Param::temp_ambient) -5 && Compressor::GetDuty() > 80);
@@ -109,47 +120,6 @@ ThermalDemands assessDemands() {
     Param::SetInt(Param::thermal_demands, thermal_demands);
 
     return demands;
-}
-
-
-float estimateCOP(float W_elec_W, uint16_t rpm, float T_in_C, float P_in_bar, float T_out_C, float P_out_bar) {
-    // COP Estimation Function
-    // First-principles approx: COP = Q_useful / W_comp
-    // Q_useful ≈ ṁ_ref * Δh (latent + sensible across cycle)
-    // ṁ_ref = (RPM/60 * vol_rot * eta_vol) * ρ_vapor_suction
-    // ρ_vapor ≈ P_in * M / (R * T_in)  [ideal gas, good for low-P suction]
-    // Δh ≈ h_fg (R1234yf ~170 kJ/kg avg) + c_p_vap * (T_out - T_in)  [rough superheat/sensible]
-    // W_comp = W_elec / eta_motor  [~0.9]
-
-    // Constants for R1234yf (from NIST EOS approx)
-    const float M = 114.04f / 1000.0f;  // kg/mol
-    const float R = 8.314f / M;         // J/kg-K (specific gas const)
-    const float h_fg_avg = 170.0f;      // kJ/kg latent (evap/cond range)
-    const float c_p_vap = 0.95f;        // kJ/kg-K vapor avg
-    const float eta_vol = 0.85f;        // Vol eff (paramize if needed)
-    const float eta_motor = 0.90f;      // Motor eff
-
-    // Suction vapor density (ideal gas, bar→Pa, C→K)
-    float T_in_K = T_in_C + 273.15f;
-    float P_in_Pa = P_in_bar * 1e5f;
-    float rho_vap = (P_in_Pa / (R * T_in_K));  // kg/m³
-
-    // Mass flow ṁ (kg/s)
-    float vol_rot_m3 = 45e-6f;  // 45 cc/rev = 45e-6 m³/rev
-    float m_dot = (rpm / 60.0f * vol_rot_m3 * eta_vol) * rho_vap;
-
-    // Approx Δh across cycle (latent dominant + sensible discharge)
-    float delta_h = h_fg_avg + c_p_vap * (T_out_C - T_in_C);  // kJ/kg
-
-    // Q_useful (kW; same approx for heat/cool)
-    float Q_useful = m_dot * delta_h / 1000.0f;  // kW (m_dot in kg/s, delta_h kJ/kg)
-
-    // W_comp (kW)
-    float W_comp = W_elec_W / 1000.0f / eta_motor;
-
-    // COP (guard div0)
-    float cop = (W_comp > 0.1f) ? Q_useful / W_comp : 0.0f;
-    return cop;
 }
 
 
@@ -176,12 +146,12 @@ static void adjustEvaporatorSplit(uint8_t& cabin, uint8_t& coolant, uint8_t comp
 void getAvailableSourcesSinks(const ThermalDemands& demands, SourceData sources[3], SinkData sinks[2]) {
     float ambientTemp = Param::GetInt(Param::temp_ambient);
     float batteryTemp = Param::GetInt(Param::temp_outlet_battery);
-    const float recircTemp = RECIRC_TEMP_THRESHOLD; // Ranking trick to force self-heat mode under treshold.
+    const float selfheatTemp = SELFHEAT_TEMP_THRESHOLD; // Dummy ranking temp so self-heat only wins below this
 
     // Sources – always available when physically present
     sources[0] = {SourceType::BATTERY, {!demands.batteryHeating, batteryTemp}}; // Can't source heat from battery if it needs heating
     sources[1] = {SourceType::AMBIENT, {true, ambientTemp}}; // Always a heat source
-    sources[2] = {SourceType::RECIRCULATION, {true, recircTemp}}; // Always a heat source (COP=1, compressor energy to heat)
+    sources[2] = {SourceType::SELFHEAT, {true, selfheatTemp}}; // COP=1, compressor dissipation
 
     // Sinks – availability based on demand (user wants to use it as heat sink)
     sinks[0] = {SinkType::BATTERY, {!demands.batteryCooling, batteryTemp}}; // Battery is heatsink unless it needs cooling
@@ -279,30 +249,8 @@ void thermalControl() {
     SinkData sinks[2];
     getAvailableSourcesSinks(demands, sources, sinks);
 
-    // Dynamic setpoint for condensor/evaporator to 
-    float ambient = Param::GetInt(Param::temp_ambient);
-    int32_t ambient_low = RECIRC_TEMP_THRESHOLD;  // e.g., -20
-    int32_t ambient_high = 10;
-    int32_t condensor_min = 40;
-    int32_t condensor_max = 60;
-
-    // below -20C ambient the condensor setpoint is 40, above 10C the setpoint is 60C. between ambient -20C and 10C linear interpolation
-    // this is an attempt to improve COP in some conditions
-    int32_t condensor_set_int = utils::change(ambient, ambient_low, ambient_high, condensor_min, condensor_max);
-    int32_t condensor_setpoint = std::max(condensor_min, std::min(condensor_max, condensor_set_int)); // Clamp
-
-    int32_t evap_min = 5;
-    int32_t evap_max = 10;
-    int32_t ambient_low_cool = 30;
-    int32_t ambient_high_cool = 50;
-
-    // below 30C ambient the evaporator setpoint is 5C, above 50C the setpoint is 10C. between ambient 30C and 50C linear interpolation
-    // this is an attempt to improve COP in some conditions
-    int32_t evap_set_int = utils::change(ambient, ambient_low_cool, ambient_high_cool, evap_min, evap_max);
-    int32_t evap_setpoint = std::max(evap_min, std::min(evap_max, evap_set_int)); // Clamp
-
-    SourceType bestSource = selectBestSource(condensor_setpoint, sources);
-    SinkType bestSink = selectBestSink(evap_setpoint, sinks);
+    SourceType bestSource = selectBestSource(Param::GetInt(Param::temp_condensor_setp), sources);
+    SinkType bestSink = selectBestSink(Param::GetInt(Param::temp_evaporator_setp), sinks);
 
     /* Water pump control */
     // Tie waterpump speeds to compressor with minimum and maximum of 20-100% waterpump duty.
@@ -329,7 +277,7 @@ void thermalControl() {
         pwm_write(0, PWM_FAN_TIM, PWM_FAN_OC, PWM_FAN_ARR); // Fan off
     
 
-    // SourceType:  AMBIENT, BATTERY, RECIRCULATION
+    // SourceType:  AMBIENT, BATTERY, SELFHEAT
     // SinkType:    AMBIENT, BATTERY
 
     // OctoPos::POS2_SERIES     Condensor -> Radiator -> Evaporator -> Battery -> Powertrain
@@ -339,8 +287,8 @@ void thermalControl() {
 
 
     // Dominant cooling
-    if (    (demands.batteryCooling && demands.powertrainCooling)
-        ||  (demands.cabinCooling && bestSink == SinkType::AMBIENT) 
+    if (    (demands.powertrainCooling && !demands.batteryHeating)
+        ||  (demands.cabinCooling && bestSink == SinkType::AMBIENT)
         ||  ((demands.cabinLHeating || demands.cabinRHeating) && bestSource == SourceType::BATTERY)
        )
         Valve::octoSetPos(OctoPos::POS2_SERIES);   // Condensor -> Radiator -> Evaporator -> Battery -> Powertrain
@@ -354,7 +302,7 @@ void thermalControl() {
         // Evaporator takes heat from ambient. Condensor CAN heat battery and/or cabin. Powertrain passively cooled
 
     // Dominant heating
-    else if ((demands.cabinLHeating || demands.cabinRHeating || demands.batteryHeating) && bestSource == SourceType::RECIRCULATION)
+    else if ((demands.cabinLHeating || demands.cabinRHeating || demands.batteryHeating) && bestSource == SourceType::SELFHEAT)
         Valve::octoSetPos(OctoPos::POS4_RBYPASS);  // Condensor -> Evaporator -> Battery -> Powertrain
         // Only when too cold. i.e. when selectBestSource returns self heat as most efficient mode
         // Can heat cabin and battery, also takes in wasteheat from powertrain
@@ -391,9 +339,9 @@ void thermalControl() {
         Valve::expansionSetPos(EXPV_CONDENSOR_CABINL, cabinL);
 
         // Evaporator valves for heat absorption
-        Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT,(bestSource != SourceType::RECIRCULATION) ? controlOutput : 0); // Absorb heat from source
+        Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT,(bestSource != SourceType::SELFHEAT) ? controlOutput : 0); // Absorb heat from source
         Valve::expansionSetPos(EXPV_EVAPORATOR_CABIN, 0); // Always 0. Cabin is not a source
-        Valve::expansionSetPos(EXPV_EVAPORATOR_RECIRC, (bestSource == SourceType::RECIRCULATION) ? controlOutput : 0);
+        Valve::expansionSetPos(EXPV_EVAPORATOR_RECIRC, (bestSource == SourceType::SELFHEAT) ? controlOutput : 0);
     }
     // Dominant cooling mode
     else if (demands.cabinCooling || demands.batteryCooling || demands.powertrainCooling)
