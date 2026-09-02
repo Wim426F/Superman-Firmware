@@ -38,7 +38,7 @@
  * IDs are 16 bit, so 65535 is the maximum
  */
 
-#define VERSION 0.6.superman
+#define VERSION 0.7.superman
 
 /* Entries must be ordered as follows:
    1. Saveable parameters (id != 0)
