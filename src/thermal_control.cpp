@@ -29,16 +29,32 @@ const float BATTERY_COOL_THRESHOLD = 40.0f;  // °C
 const float POWERTRAIN_COOL_THRESHOLD = 50.0f;  // °C
 const float HIGH_PRESSURE_LIMIT = 30.0f;  // Bar
 const float LOW_PRESSURE_LIMIT = 1.0f;    // Bar
-const float MIN_VALVE_POSITION = 5.0f;
 const float SELFHEAT_TEMP_THRESHOLD = -20.0f;  // recirc is heatsource below this temp
 const float RANK_HYSTERYSIS = 5.0f;            // °C; hysterysis on source/sink selection to avoid octovalve constant changing
 
-// PI control constants
-const float Kp = 1.0f;
-const float Ki = 0.1f;
-static float accumulated_error = 0.0f;
-float dt = 0.1f; // Loop time 100ms
-float last_error = 0;
+// Cascade: inner EXV PI on T, outer compressor on whether that EXV is saturated.
+// 100ms loop. EXV never below 40 in use (stall). Outer loop treats <=50 as "can't close more".
+const float EXPV_MIN_POS = 40.0f;
+const float EXPV_SAT_POS = 50.0f;        // inner loop saturated closed
+const float EXPV_START_POS = 100.0f;
+const float EXPV_SLEW = 4.0f;            // counts per 100ms (~5s for 40-255)
+const float T_HOLD_BAND = 2.0f;          // °C, "at setpoint"
+
+const float COMPRESSOR_START_DUTY = 65.0f; // blind start, then outer loop walks it
+const float COMPRESSOR_MIN_RUN = 15.0f;  // 1-15% is useless; go to 0 instead
+const float COMPRESSOR_SLEW = 2.0f;      // % per 100ms, ramp to start
+const float COMPRESSOR_TRIM = 0.5f;      // % per 100ms, outer loop
+const float PRESSURE_SLEW = 5.0f;
+
+// EXV PI: too hot → close. 10K error → 4 counts/tick (slew-limited).
+const float Kp = 4.0f;
+const float Ki = 0.8f;
+const float dt = 0.1f;
+static float last_error = 0.0f;
+static float lastDutyCmd = 0.0f;
+static float dutyTarget = 0.0f;
+static float lastValveCmd = 255.0f;
+static bool capacityRunning = false;
 
 // Source and sink types
 // Cabin is never a source or sink, as control is from its perspective. It can only need a source or sink.
@@ -136,7 +152,7 @@ static void adjustCondenserSplit(uint8_t& cabinL, uint8_t& cabinR, uint8_t& cool
 // Prioritize cabin cooling: reduce coolant evap opening if overloaded
 static void adjustEvaporatorSplit(uint8_t& cabin, uint8_t& coolant, uint8_t compressorDuty) {
     if (compressorDuty > 90 && (Param::GetInt(Param::temp_inlet_compressor) - Param::GetInt(Param::temp_evaporator_setp) > 2.0f)) {
-        coolant = std::max(static_cast<uint8_t>(coolant - 5), static_cast<uint8_t>(0)); // Close coolant more, divert flow to cabin, -10%
+        coolant = std::max(static_cast<uint8_t>(coolant - 5), static_cast<uint8_t>(EXPV_MIN_POS)); // Close coolant more, divert flow to cabin
     } else if (compressorDuty < 80 && (Param::GetInt(Param::temp_outlet_battery) - Param::GetInt(Param::temp_battery_max) > 2.0f)) {
         coolant = std::min(static_cast<uint8_t>(coolant + 5), static_cast<uint8_t>(255)); // Open coolant more if battery needs it
     }
@@ -204,43 +220,59 @@ SinkType selectBestSink(float targetTemp, const SinkData sinks[2]) {
 }
 
 
-uint8_t runPiControl(float setpoint, float measured) {
-    float highPressure = Param::GetInt(Param::pressure_outlet_compressor);
-    float lowPressure = Param::GetInt(Param::pressure_pre_evaporator);
-    uint8_t currentDuty = Compressor::GetDuty();
-
-    // Pressure overrides (incremental)
-    if (highPressure > HIGH_PRESSURE_LIMIT) {
-        ErrorMessage::Post(ERR_REFRIGERANT_HIGHP);
-        int newDuty = std::max(0, static_cast<int>(currentDuty - 1)); // Unload compressor
-        Compressor::SetDuty(static_cast<uint8_t>(newDuty));
-        return static_cast<uint8_t>(newDuty * 2.55f); // Scale for valve
-    }
-    if (lowPressure < LOW_PRESSURE_LIMIT) {
-        ErrorMessage::Post(ERR_REFRIGERANT_LOWP);
-        int newDuty = std::max(0, static_cast<int>(currentDuty - 1)); // Unload compressor
-        Compressor::SetDuty(static_cast<uint8_t>(newDuty));
-        return static_cast<uint8_t>(newDuty * 2.55f);
+// Inner: evap EXV on T (too hot → close). Outer: compressor ṁ from EXV saturation.
+// Returns the shared evap EXV command (40-255).
+uint8_t runCapacityControl(float setpoint, float measured) {
+    if (!capacityRunning) {
+        capacityRunning = true;
+        last_error = measured - setpoint;
+        lastValveCmd = EXPV_START_POS;
+        dutyTarget = COMPRESSOR_START_DUTY;
     }
 
-    // PI with anti-windup
-    float error = setpoint - measured;
-    accumulated_error += error * dt;
-    if (error * last_error < 0.0f) accumulated_error *= 0.5f; // Decay on reversal
+    float highPressure = Param::GetFloat(Param::pressure_outlet_compressor);
+    float lowPressure = Param::GetFloat(Param::pressure_pre_evaporator);
+    if (highPressure > HIGH_PRESSURE_LIMIT) ErrorMessage::Post(ERR_REFRIGERANT_HIGHP);
+    if (lowPressure < LOW_PRESSURE_LIMIT) ErrorMessage::Post(ERR_REFRIGERANT_LOWP);
+    bool pressureCut = (highPressure > HIGH_PRESSURE_LIMIT || lowPressure < LOW_PRESSURE_LIMIT);
+
+    // Inner loop: EXV. error > 0 means too hot.
+    float error = measured - setpoint;
+    float delta = -(Kp * (error - last_error) + Ki * error * dt);
     last_error = error;
+    if (delta > EXPV_SLEW) delta = EXPV_SLEW;
+    if (delta < -EXPV_SLEW) delta = -EXPV_SLEW;
+    lastValveCmd += delta;
+    if (lastValveCmd < EXPV_MIN_POS) lastValveCmd = EXPV_MIN_POS;
+    if (lastValveCmd > 255.0f) lastValveCmd = 255.0f;
 
-    float controlOutput = Kp * error + Ki * accumulated_error;
-    controlOutput = std::max(0.0f, std::min(100.0f, controlOutput));
+    // Outer loop: compressor. Slow. Don't sit in 1-15%.
+    if (pressureCut) {
+        dutyTarget = 0.0f;
+    } else {
+        bool tooHot = (error > T_HOLD_BAND);
+        bool tooCold = (error < -T_HOLD_BAND);
+        bool atSet = !tooHot && !tooCold;
+        bool satClosed = (lastValveCmd <= EXPV_SAT_POS);
+        bool satOpen = (lastValveCmd >= 250.0f);
 
-    // Anti-windup
-    if (controlOutput >= 100.0f) accumulated_error = std::min(accumulated_error, (100.0f - Kp * error) / Ki);
-    if (controlOutput <= 0.0f) accumulated_error = std::max(accumulated_error, (-Kp * error) / Ki);
+        if (tooHot && satClosed) dutyTarget += COMPRESSOR_TRIM;
+        else if (tooCold && satOpen) dutyTarget -= COMPRESSOR_TRIM;
+        else if (atSet && lastValveCmd > EXPV_SAT_POS + 10.0f) dutyTarget -= COMPRESSOR_TRIM;
 
-    Compressor::SetDuty(static_cast<uint8_t>(controlOutput));
+        if (dutyTarget > 100.0f) dutyTarget = 100.0f;
+        if (dutyTarget < COMPRESSOR_MIN_RUN) dutyTarget = 0.0f;
+        if (tooHot && satClosed && dutyTarget < COMPRESSOR_MIN_RUN)
+            dutyTarget = COMPRESSOR_MIN_RUN;
+    }
 
-    uint8_t valveOutput = static_cast<uint8_t>(controlOutput * 2.55f);
-    valveOutput = utils::limitVal(valveOutput, MIN_VALVE_POSITION, 255);
-    return valveOutput;
+    float slew = pressureCut ? PRESSURE_SLEW : COMPRESSOR_SLEW;
+    if (dutyTarget > lastDutyCmd + slew) lastDutyCmd += slew;
+    else if (dutyTarget < lastDutyCmd - slew) lastDutyCmd -= slew;
+    else lastDutyCmd = dutyTarget;
+
+    Compressor::SetDuty(static_cast<uint8_t>(lastDutyCmd));
+    return static_cast<uint8_t>(lastValveCmd);
 }
 
 void thermalControl() {
@@ -321,8 +353,8 @@ void thermalControl() {
 
         float setpoint = Param::GetInt(Param::temp_condensor_setp);
         float measured = Param::GetInt(Param::temp_outlet_compressor);
-        uint8_t controlOutput = runPiControl(setpoint, measured);
-        uint8_t compressorDuty = Compressor::GetDuty();
+        uint8_t evap = runCapacityControl(setpoint, measured);
+        uint8_t compressorDuty = (uint8_t)lastDutyCmd;
 
         uint8_t cabinL = demands.cabinLHeating ? 255 : 0;
         uint8_t cabinR = demands.cabinRHeating ? 255 : 0;
@@ -339,9 +371,9 @@ void thermalControl() {
         Valve::expansionSetPos(EXPV_CONDENSOR_CABINL, cabinL);
 
         // Evaporator valves for heat absorption
-        Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT,(bestSource != SourceType::SELFHEAT) ? controlOutput : 0); // Absorb heat from source
+        Valve::expansionSetPos(EXPV_EVAPORATOR_COOLANT,(bestSource != SourceType::SELFHEAT) ? evap : 0); // Absorb heat from source
         Valve::expansionSetPos(EXPV_EVAPORATOR_CABIN, 0); // Always 0. Cabin is not a source
-        Valve::expansionSetPos(EXPV_EVAPORATOR_RECIRC, (bestSource == SourceType::SELFHEAT) ? controlOutput : 0);
+        Valve::expansionSetPos(EXPV_EVAPORATOR_RECIRC, (bestSource == SourceType::SELFHEAT) ? evap : 0);
     }
     // Dominant cooling mode
     else if (demands.cabinCooling || demands.batteryCooling || demands.powertrainCooling)
@@ -350,11 +382,11 @@ void thermalControl() {
 
         float setpoint = Param::GetInt(Param::temp_evaporator_setp);
         float measured = Param::GetInt(Param::temp_inlet_compressor);
-        uint8_t controlOutput = runPiControl(setpoint, measured);
-        uint8_t compressorDuty = Compressor::GetDuty();
+        uint8_t evap = runCapacityControl(setpoint, measured);
+        uint8_t compressorDuty = (uint8_t)lastDutyCmd;
 
-        uint8_t cabin = demands.cabinCooling ? controlOutput : 0;
-        uint8_t coolant = (demands.batteryCooling || demands.powertrainCooling) ? controlOutput : 0;
+        uint8_t cabin = demands.cabinCooling ? evap : 0;
+        uint8_t coolant = (demands.batteryCooling || demands.powertrainCooling) ? evap : 0;
 
         adjustEvaporatorSplit(cabin, coolant, compressorDuty);
 
@@ -381,6 +413,11 @@ void thermalControl() {
         Valve::expansionSetPos(EXPV_EVAPORATOR_CABIN, 255);
         Valve::expansionSetPos(EXPV_EVAPORATOR_RECIRC, 255);
 
-        Compressor::SetDuty(0); // Disable compressor when idle
+        Compressor::SetDuty(0);
+        last_error = 0.0f;
+        lastDutyCmd = 0.0f;
+        dutyTarget = 0.0f;
+        lastValveCmd = 255.0f;
+        capacityRunning = false;
     }
 }
