@@ -119,9 +119,7 @@ ThermalDemands assessDemands() {
     else if (powertrainTemp < Param::GetInt(Param::temp_powertrain_max) - RANK_HYSTERYSIS) bPtCoolLatch = false;
     demands.powertrainCooling = bPtCoolLatch;
 
-    // If radiator coolant returns much cooler coolant than ambient it might we choking (freezing itself in) TODO
-    //demands.radiatorDefrost = (heating && Param::GetInt(Param::temp_radiator) < Param::GetInt(Param::temp_ambient) -5 && Compressor::GetDuty() > 80);
-    demands.radiatorDefrost = false;  // Initialize to false for now
+    demands.radiatorDefrost = false;  // Initialize false for now
 
     int thermal_demands = 0;
 
@@ -275,7 +273,96 @@ uint8_t runCapacityControl(float setpoint, float measured) {
     return static_cast<uint8_t>(lastValveCmd);
 }
 
+
+
+/*                                          */
+/*      Manual coolant purge routine        */ 
+/*                                          */
+
+// This routine tries to mimmick Tesla coolant air purge mode.
+// We run the pumps at varying speeds to try and "knock" the trapped air pockets away.
+// This is done while stepping through all octovalve positions to make sure we hit every branch.
+
+static const int PURGE_POS_SEQ[] = {2, 3, 4, 5, 4, 3}; // Octovalve positions to step
+static const uint8_t PURGE_DUTY_SEQ[] = {100, 30, 100, 30}; // switch between high/low pump speeds to break air pockets.
+static const uint32_t PURGE_DWELL_MS[] = {15000, 5000, 15000, 5000}; // 15s high, 5s low speed for waterpump
+static const int PURGE_POS_COUNT = sizeof(PURGE_POS_SEQ) / sizeof(PURGE_POS_SEQ[0]);
+static const int PURGE_PHASE_COUNT = sizeof(PURGE_DUTY_SEQ) / sizeof(PURGE_DUTY_SEQ[0]);
+
+static int purge_pos_idx = 0;      // index into PURGE_POS_SEQ
+static int purge_duty_idx = 0;     // phase: 100% / 30% / 100% / 30%
+static uint32_t purge_dwell_ms = 0; // remaining ms of the current phase, ticked at 100 ms
+static bool purge_low_level = false; // reservoir at/below minimum, waiting for refill
+static bool purge_active = false;    // purge ran on the previous cycle (clean exit transient)
+
+static void purgeRoutine()
+{
+    int level = Param::GetInt(Param::reservoir_level);
+
+    // Reservoir at or below minimum: pumps off, hold the current step.
+    // Do not advance and do not exit purge. When level recovers, the
+    // current step's timer restarts.
+    if (level <= COOLANT_MINIMUM) {
+        Waterpump::powertrainSetDuty(0);
+        Waterpump::batterySetDuty(0);
+        purge_low_level = true;
+        return;
+    }
+
+    if (purge_low_level) {
+        purge_low_level = false;
+        purge_dwell_ms = PURGE_DWELL_MS[purge_duty_idx]; // restart the current step
+    }
+
+    Valve::octoSetPos(PURGE_POS_SEQ[purge_pos_idx]);
+
+    Waterpump::powertrainSetDuty(PURGE_DUTY_SEQ[purge_duty_idx]);
+    Waterpump::batterySetDuty(PURGE_DUTY_SEQ[purge_duty_idx]);
+
+    purge_dwell_ms -= 100; // this runs every 100 ms
+    if (purge_dwell_ms == 0) {
+        if (++purge_duty_idx >= PURGE_PHASE_COUNT) {
+            purge_duty_idx = 0;
+            purge_pos_idx = (purge_pos_idx + 1) % PURGE_POS_COUNT;
+        }
+        purge_dwell_ms = PURGE_DWELL_MS[purge_duty_idx];
+    }
+}
+
+
 void thermalControl() {
+    // Manual coolant purge, inhibits thermal control while running.
+    if (Param::GetInt(Param::purge) == 1) {
+        if (!purge_active) {
+            purge_active = true;
+            // Start a fresh sweep and arm the first phase timer.
+            purge_pos_idx = 0;
+            purge_duty_idx = 0;
+            purge_dwell_ms = PURGE_DWELL_MS[0];
+            purge_low_level = false;
+            // Reset capacity control state so it starts fresh after purge.
+            last_error = 0.0f;
+            lastDutyCmd = 0.0f;
+            dutyTarget = 0.0f;
+            lastValveCmd = 255.0f;
+            capacityRunning = false;
+        }
+        Compressor::SetDuty(0);
+        Param::SetInt(Param::opmode, 3); // 3 = "Purge"
+        purgeRoutine();
+        return;
+    }
+
+    // Purge just stopped: stop the pumps, leave the octovalve where it is,
+    // normal thermal control resumes from the next cycle.
+    if (purge_active) {
+        purge_active = false;
+        Param::SetInt(Param::opmode, 0);
+        Waterpump::powertrainSetDuty(0);
+        Waterpump::batterySetDuty(0);
+        return;
+    }
+
     ThermalDemands demands = assessDemands();
     SourceData sources[3];
     SinkData sinks[2];

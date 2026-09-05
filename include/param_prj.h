@@ -38,14 +38,14 @@
  * IDs are 16 bit, so 65535 is the maximum
  */
 
-#define VERSION 0.7.superman
+#define VERSION 0.8.superman
 
 /* Entries must be ordered as follows:
    1. Saveable parameters (id != 0)
    2. Temporary parameters (id = 0)
    3. Display values
  */
-//Next param id (increase when adding new parameter!): 16
+//Next param id (increase when adding new parameter!): 17
 //Next value Id: 2066
 /*             category     name                   unit          min     max      default  id */
 #define PARAM_LIST \
@@ -59,6 +59,7 @@
    PARAM_ENTRY(CAT_CTRL,    temp_condensor_setp,   "°C",        -30,     100,     70,      9  ) \
    PARAM_ENTRY(CAT_CTRL,    compressor_plim,       "W",          0,      6000,    6000,    10 ) \
    PARAM_ENTRY(CAT_COMM,    canemu,                CANEMU,       0,      2,       0,       11 ) \
+   PARAM_ENTRY(CAT_CTRL,    purge,                 ONOFF,        0,      1,       0,       16 ) \
    VALUE_ENTRY(octovalve_position,          OCTOPOS,   2005 ) \
    VALUE_ENTRY(octovalve_setpoint,          OCTOPOS,   2044 ) \
    VALUE_ENTRY(heat_transfer_mode, HEAT_TRNSFR_MODE,   2046 ) \
@@ -120,7 +121,7 @@
 /***** Enum String definitions *****/
 #define VERSTR STRINGIFY(4=VERSION)
 
-#define OPMODES            "0=Off, 1=Run, 2=Preheat"
+#define OPMODES            "0=Off, 1=Run, 2=Preheat, 3=AirPurge"
 #define OCTOPOS            "0=Unknown, 1=Series, 2=Series, 3=AmbientSource, 4=RadiatorBypass, 5=Parallel"
 #define HEAT_TRNSFR_MODE   "0=Passive, 1=DominantHeating, 2=DominantCooling"
 #define BEST_SINK          "0=Ambient, 1=Battery"
